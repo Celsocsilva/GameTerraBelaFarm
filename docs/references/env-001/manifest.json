@@ -1,0 +1,495 @@
+{
+  "name": "TerraBela Farm | Ambientação Cozy v1",
+  "items": [
+    {
+      "path": "assets/decor/flowers/daisies_white.png",
+      "kind": "sprite",
+      "width": 145,
+      "height": 104,
+      "group": "flowers",
+      "source_id": 19,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/flowers/flowers_yellow.png",
+      "kind": "sprite",
+      "width": 120,
+      "height": 99,
+      "group": "flowers",
+      "source_id": 21,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/flowers/flowers_purple.png",
+      "kind": "sprite",
+      "width": 126,
+      "height": 104,
+      "group": "flowers",
+      "source_id": 20,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/flowers/flowers_red.png",
+      "kind": "sprite",
+      "width": 124,
+      "height": 114,
+      "group": "flowers",
+      "source_id": 18,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/flowers/sunflowers.png",
+      "kind": "sprite",
+      "width": 123,
+      "height": 131,
+      "group": "flowers",
+      "source_id": 14,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/vegetation/grass_tuft_spiky.png",
+      "kind": "sprite",
+      "width": 143,
+      "height": 121,
+      "group": "vegetation",
+      "source_id": 15,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/vegetation/grass_tuft_broad.png",
+      "kind": "sprite",
+      "width": 138,
+      "height": 113,
+      "group": "vegetation",
+      "source_id": 17,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/rocks/rock_cluster_small.png",
+      "kind": "sprite",
+      "width": 181,
+      "height": 84,
+      "group": "rocks",
+      "source_id": 22,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/rocks/rock_cluster_medium.png",
+      "kind": "sprite",
+      "width": 203,
+      "height": 113,
+      "group": "rocks",
+      "source_id": 16,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/rocks/rock_cluster_large.png",
+      "kind": "sprite",
+      "width": 219,
+      "height": 152,
+      "group": "rocks",
+      "source_id": 13,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/vegetation/bush_white_flowers.png",
+      "kind": "sprite",
+      "width": 147,
+      "height": 127,
+      "group": "vegetation",
+      "source_id": 33,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/vegetation/bush_red_berries.png",
+      "kind": "sprite",
+      "width": 137,
+      "height": 130,
+      "group": "vegetation",
+      "source_id": 32,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/vegetation/bush_purple_flowers.png",
+      "kind": "sprite",
+      "width": 135,
+      "height": 128,
+      "group": "vegetation",
+      "source_id": 34,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/trees/tree_green.png",
+      "kind": "sprite",
+      "width": 156,
+      "height": 159,
+      "group": "trees",
+      "source_id": 29,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/trees/tree_orchard.png",
+      "kind": "sprite",
+      "width": 134,
+      "height": 154,
+      "group": "trees",
+      "source_id": 30,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/trees/tree_pink_blossom.png",
+      "kind": "sprite",
+      "width": 136,
+      "height": 157,
+      "group": "trees",
+      "source_id": 27,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/trees/tree_pine.png",
+      "kind": "sprite",
+      "width": 131,
+      "height": 174,
+      "group": "trees",
+      "source_id": 26,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/fence_wood.png",
+      "kind": "sprite",
+      "width": 247,
+      "height": 123,
+      "group": "farm_props",
+      "source_id": 35,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/fence_gate.png",
+      "kind": "sprite",
+      "width": 172,
+      "height": 142,
+      "group": "farm_props",
+      "source_id": 31,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/path_dirt.png",
+      "kind": "sprite",
+      "width": 116,
+      "height": 122,
+      "group": "farm_props",
+      "source_id": 44,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/path_stones_round.png",
+      "kind": "sprite",
+      "width": 114,
+      "height": 122,
+      "group": "farm_props",
+      "source_id": 45,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/path_stones_large.png",
+      "kind": "sprite",
+      "width": 113,
+      "height": 123,
+      "group": "farm_props",
+      "source_id": 43,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/path_wood_planks.png",
+      "kind": "sprite",
+      "width": 114,
+      "height": 122,
+      "group": "farm_props",
+      "source_id": 46,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/path_pebbles.png",
+      "kind": "sprite",
+      "width": 119,
+      "height": 122,
+      "group": "farm_props",
+      "source_id": 47,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/sign_wood_blank.png",
+      "kind": "sprite",
+      "width": 162,
+      "height": 144,
+      "group": "farm_props",
+      "source_id": 40,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/sign_wood_arrow.png",
+      "kind": "sprite",
+      "width": 124,
+      "height": 134,
+      "group": "farm_props",
+      "source_id": 49,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/lantern_post.png",
+      "kind": "sprite",
+      "width": 126,
+      "height": 161,
+      "group": "farm_props",
+      "source_id": 39,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/barrel_wood.png",
+      "kind": "sprite",
+      "width": 112,
+      "height": 121,
+      "group": "farm_props",
+      "source_id": 41,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/hay_bale.png",
+      "kind": "sprite",
+      "width": 116,
+      "height": 104,
+      "group": "farm_props",
+      "source_id": 52,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/wood_logs.png",
+      "kind": "sprite",
+      "width": 112,
+      "height": 102,
+      "group": "farm_props",
+      "source_id": 50,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/crate_empty.png",
+      "kind": "sprite",
+      "width": 99,
+      "height": 100,
+      "group": "farm_props",
+      "source_id": 51,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/sack_burlap.png",
+      "kind": "sprite",
+      "width": 83,
+      "height": 108,
+      "group": "farm_props",
+      "source_id": 48,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/farm_props/wood_wheel.png",
+      "kind": "sprite",
+      "width": 107,
+      "height": 115,
+      "group": "farm_props",
+      "source_id": 42,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/decor/vegetation/grass_flower_rock_patch.png",
+      "kind": "sprite",
+      "width": 184,
+      "height": 111,
+      "group": "vegetation",
+      "source_id": 63,
+      "alpha_extrema": [
+        0,
+        253
+      ]
+    },
+    {
+      "path": "assets/decor/flowers/flower_patch_red.png",
+      "kind": "sprite",
+      "width": 131,
+      "height": 103,
+      "group": "flowers",
+      "source_id": 60,
+      "alpha_extrema": [
+        0,
+        254
+      ]
+    },
+    {
+      "path": "assets/terrain/patches/grass_patch_plain.png",
+      "kind": "non_tileable_decorative_patch",
+      "width": 195,
+      "height": 186
+    },
+    {
+      "path": "assets/terrain/patches/grass_patch_daisies.png",
+      "kind": "non_tileable_decorative_patch",
+      "width": 195,
+      "height": 187
+    },
+    {
+      "path": "assets/terrain/patches/grass_patch_yellow.png",
+      "kind": "non_tileable_decorative_patch",
+      "width": 193,
+      "height": 187
+    },
+    {
+      "path": "assets/terrain/patches/grass_patch_pebbles.png",
+      "kind": "non_tileable_decorative_patch",
+      "width": 195,
+      "height": 188
+    },
+    {
+      "path": "assets/terrain/patches/soil_patch.png",
+      "kind": "non_tileable_decorative_patch",
+      "width": 184,
+      "height": 183
+    },
+    {
+      "path": "assets/terrain/patches/soil_patch_corner.png",
+      "kind": "non_tileable_decorative_patch",
+      "width": 182,
+      "height": 182
+    },
+    {
+      "path": "assets/terrain/grass/grass_base_seamless_512.png",
+      "kind": "seamless_tile",
+      "width": 512,
+      "height": 512,
+      "periodic_edge_max_channel_diff": 0
+    },
+    {
+      "path": "assets/terrain/grass/grass_flowers_sparse_seamless_512.png",
+      "kind": "seamless_tile",
+      "width": 512,
+      "height": 512,
+      "periodic_edge_max_channel_diff": 0
+    },
+    {
+      "path": "assets/terrain/grass/grass_pebbles_sparse_seamless_512.png",
+      "kind": "seamless_tile",
+      "width": 512,
+      "height": 512,
+      "periodic_edge_max_channel_diff": 0
+    },
+    {
+      "path": "assets/terrain/grass/grass_mixed_sparse_seamless_512.png",
+      "kind": "seamless_tile",
+      "width": 512,
+      "height": 512,
+      "periodic_edge_max_channel_diff": 0
+    }
+  ],
+  "notes": [
+    "PNG com transparência para props; textura grama RGBA opaca em 512x512, repetível.",
+    "Os patches de solo e grama com bordas altas não são seamless.",
+    "As texturas tiling podem ser aplicadas como material em PlaneMesh ou quad. Props como Sprite3D ou TextureRect.",
+    "Assets sujeitos à validação estética e de escala no Godot."
+  ]
+}

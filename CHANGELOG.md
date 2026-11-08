@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- ENV-001: integrados 45 PNGs de ambientação; grama repetível com variações locais e decoração determinística fora dos canteiros, rotas e zona de venda. Adicionados catálogo, guia, validação e capturas comparativas.
+
 - Criada a fundação Godot mobile, documentação arquitetural e estrutura de agentes.
 - Adicionada validação inicial de arquivos e workflows condicionados para Android/iOS.
 - FV-HARVEST-001: colheita automática de tomates maduros com sucção até a mochila e pilha dinâmica de até 7 caixas (8 tomates cada), com reservas transacionais, cancelamento e save.

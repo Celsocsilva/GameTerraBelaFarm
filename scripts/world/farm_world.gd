@@ -28,6 +28,7 @@ const CUSTOMER_QUEUE_SCRIPT := preload("res://scripts/customers/customer_queue.g
 const FARM_HUD_SCENE := preload("res://scenes/ui/hud/FarmHUD.tscn")
 const PLAYER_LEVEL_SCRIPT := preload("res://scripts/progression/player_level.gd")
 const MISSION_TRACKER_SCRIPT := preload("res://scripts/progression/mission_tracker.gd")
+const COZY_ENVIRONMENT_SCRIPT := preload("res://scripts/world/cozy_environment.gd")
 
 ## Mochila nas costas do fazendeiro (a frente do fazendeiro é -Z local).
 const BACKPACK_OFFSET := Vector3(0.0, 1.1, 0.62)
@@ -77,6 +78,7 @@ var crops: Dictionary = {}
 var hud: FarmHUD
 var player_level: PlayerLevel
 var mission_tracker: MissionTracker
+var cozy_environment: CozyEnvironment
 
 func _ready() -> void:
     var texture_size := SOIL_TEXTURE.get_size()
@@ -91,6 +93,7 @@ func _ready() -> void:
     _build_camera()
     _build_harvest()
     _build_sales_counter()
+    _build_cozy_environment()
     _build_hud()
     _prewarm_seed_throw()
     camera_focus = farmer.global_position
@@ -107,6 +110,19 @@ func _process(delta: float) -> void:
 
 func get_farmer_hands_position() -> Vector3:
     return farmer.global_transform * HANDS_OFFSET
+
+func _build_cozy_environment() -> void:
+    cozy_environment = COZY_ENVIRONMENT_SCRIPT.new() as CozyEnvironment
+    cozy_environment.name = "CozyEnvironment"
+    add_child(cozy_environment)
+    cozy_environment.setup(
+        $Ground/GrassSurface as MeshInstance3D,
+        farm_size,
+        get_planting_area_half_width(),
+        PLANTING_NEAR_EDGE_Z,
+        PLANTING_NEAR_EDGE_Z + planting_plot_size.y,
+        sales_counter.position
+    )
 
 ## Balcão de vendas no rodapé do mapa, fila de clientes atrás dele (+Z) e a
 ## base de dinheiro 3 x 5 ao lado, no lado do fazendeiro (-Z).
@@ -237,6 +253,7 @@ func _build_ground() -> void:
     var body := StaticBody3D.new()
     body.name = "Ground"
     var mesh := MeshInstance3D.new()
+    mesh.name = "GrassSurface"
     var plane := BoxMesh.new()
     plane.size = Vector3(farm_size, 0.4, farm_size)
     mesh.mesh = plane
