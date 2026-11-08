@@ -1,0 +1,26 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/river/river_system.gd" id="1_river"]
+[ext_resource type="PackedScene" path="res://scenes/world/river/BridgeWood.tscn" id="2_wood"]
+[ext_resource type="PackedScene" path="res://scenes/world/river/BridgeStone.tscn" id="3_stone"]
+
+[node name="RiverSystem" type="Node3D"]
+script = ExtResource("1_river")
+anchor_position = Vector3(-32, 0, -21)
+anchor_width = 3.6
+course = Array[Dictionary]([{"tile": "river_straight_horizontal", "entry": "left", "trim_entry": true, "length_px": 496}, {"tile": "river_corner_left_up"}, {"tile": "river_straight_vertical"}, {"tile": "river_straight_vertical"}, {"tile": "river_corner_right_down"}, {"tile": "river_curve_large_right"}, {"tile": "river_straight_horizontal", "length_px": 57}])
+bank_strips = Array[Dictionary]([{"asset": "bank_strip_left_flowers", "position": Vector3(-27.2, 0, -17.86), "width": 3.6}, {"asset": "bank_strip_right_flowers", "position": Vector3(-24.6, 0, -23.65), "width": 3.4}, {"asset": "bank_strip_right_flowers", "position": Vector3(-29.6, 0, 10.04), "width": 3.2}])
+
+[node name="RiverSegments" type="Node3D" parent="."]
+
+[node name="RiverBanks" type="Node3D" parent="."]
+
+[node name="WaterSurface" type="Node3D" parent="."]
+
+[node name="BridgeWood" parent="." instance=ExtResource("2_wood")]
+position = Vector3(-14.2, 0, -9.6)
+
+[node name="BridgeStone" parent="." instance=ExtResource("3_stone")]
+position = Vector3(-14.2, 0, 1.6)
+
+[node name="RiverCollisions" type="Node3D" parent="."]

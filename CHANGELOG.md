@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- ENV-002: rio modular no lado oeste do mapa com 14 PNGs do pacote Rio e Pontes v1, água animada por shader leve, peças de junção sem frestas, faixas de margem com flores, ponte de madeira (`BridgeWood.tscn`, com acessos) e ponte de pedra (`BridgeStone.tscn`) atravessáveis por superfície em arco e corrimãos invisíveis. A água bloqueia a passagem fora das pontes; decoração e plantio respeitam o rio. Adicionados `river_tile_bake.gd`, `river_smoke.gd`, `river_capture.gd`, documentação e evidências em `docs/evidence/river_bridges/`.
+
+- ENV-001: integrados 45 PNGs de ambientação; grama repetível com variações locais e decoração determinística fora dos canteiros, rotas e zona de venda. Adicionados catálogo, guia, validação e capturas comparativas.
+
 - Criada a fundação Godot mobile, documentação arquitetural e estrutura de agentes.
 - Adicionada validação inicial de arquivos e workflows condicionados para Android/iOS.
 - FV-HARVEST-001: colheita automática de tomates maduros com sucção até a mochila e pilha dinâmica de até 7 caixas (8 tomates cada), com reservas transacionais, cancelamento e save.

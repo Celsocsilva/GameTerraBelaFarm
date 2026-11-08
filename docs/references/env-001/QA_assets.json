@@ -1,0 +1,632 @@
+[
+  {
+    "path": "assets/decor/flowers/daisies_white.png",
+    "dimensions": [
+      145,
+      104
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      6,
+      136,
+      95
+    ]
+  },
+  {
+    "path": "assets/decor/flowers/flowers_yellow.png",
+    "dimensions": [
+      120,
+      99
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      9,
+      112,
+      90
+    ]
+  },
+  {
+    "path": "assets/decor/flowers/flowers_purple.png",
+    "dimensions": [
+      126,
+      104
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      7,
+      8,
+      118,
+      95
+    ]
+  },
+  {
+    "path": "assets/decor/flowers/flowers_red.png",
+    "dimensions": [
+      124,
+      114
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      8,
+      116,
+      106
+    ]
+  },
+  {
+    "path": "assets/decor/flowers/sunflowers.png",
+    "dimensions": [
+      123,
+      131
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      9,
+      8,
+      115,
+      123
+    ]
+  },
+  {
+    "path": "assets/decor/vegetation/grass_tuft_spiky.png",
+    "dimensions": [
+      143,
+      121
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      9,
+      9,
+      135,
+      112
+    ]
+  },
+  {
+    "path": "assets/decor/vegetation/grass_tuft_broad.png",
+    "dimensions": [
+      138,
+      113
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      9,
+      9,
+      129,
+      104
+    ]
+  },
+  {
+    "path": "assets/decor/rocks/rock_cluster_small.png",
+    "dimensions": [
+      181,
+      84
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      9,
+      8,
+      173,
+      76
+    ]
+  },
+  {
+    "path": "assets/decor/rocks/rock_cluster_medium.png",
+    "dimensions": [
+      203,
+      113
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      8,
+      195,
+      106
+    ]
+  },
+  {
+    "path": "assets/decor/rocks/rock_cluster_large.png",
+    "dimensions": [
+      219,
+      152
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      9,
+      210,
+      144
+    ]
+  },
+  {
+    "path": "assets/decor/vegetation/bush_white_flowers.png",
+    "dimensions": [
+      147,
+      127
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      8,
+      140,
+      119
+    ]
+  },
+  {
+    "path": "assets/decor/vegetation/bush_red_berries.png",
+    "dimensions": [
+      137,
+      130
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      9,
+      6,
+      130,
+      121
+    ]
+  },
+  {
+    "path": "assets/decor/vegetation/bush_purple_flowers.png",
+    "dimensions": [
+      135,
+      128
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      6,
+      8,
+      128,
+      120
+    ]
+  },
+  {
+    "path": "assets/decor/trees/tree_green.png",
+    "dimensions": [
+      156,
+      159
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      9,
+      5,
+      150,
+      152
+    ]
+  },
+  {
+    "path": "assets/decor/trees/tree_orchard.png",
+    "dimensions": [
+      134,
+      154
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      6,
+      5,
+      126,
+      146
+    ]
+  },
+  {
+    "path": "assets/decor/trees/tree_pink_blossom.png",
+    "dimensions": [
+      136,
+      157
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      9,
+      128,
+      149
+    ]
+  },
+  {
+    "path": "assets/decor/trees/tree_pine.png",
+    "dimensions": [
+      131,
+      174
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      9,
+      123,
+      168
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/fence_wood.png",
+    "dimensions": [
+      247,
+      123
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      9,
+      9,
+      238,
+      116
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/fence_gate.png",
+    "dimensions": [
+      172,
+      142
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      9,
+      8,
+      164,
+      134
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/path_dirt.png",
+    "dimensions": [
+      116,
+      122
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      7,
+      109,
+      114
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/path_stones_round.png",
+    "dimensions": [
+      114,
+      122
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      7,
+      7,
+      107,
+      114
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/path_stones_large.png",
+    "dimensions": [
+      113,
+      123
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      7,
+      8,
+      108,
+      115
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/path_wood_planks.png",
+    "dimensions": [
+      114,
+      122
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      5,
+      7,
+      111,
+      114
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/path_pebbles.png",
+    "dimensions": [
+      119,
+      122
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      6,
+      7,
+      111,
+      114
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/sign_wood_blank.png",
+    "dimensions": [
+      162,
+      144
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      8,
+      154,
+      137
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/sign_wood_arrow.png",
+    "dimensions": [
+      124,
+      134
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      7,
+      117,
+      127
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/lantern_post.png",
+    "dimensions": [
+      126,
+      161
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      7,
+      8,
+      117,
+      153
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/barrel_wood.png",
+    "dimensions": [
+      112,
+      121
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      9,
+      9,
+      103,
+      113
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/hay_bale.png",
+    "dimensions": [
+      116,
+      104
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      8,
+      109,
+      97
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/wood_logs.png",
+    "dimensions": [
+      112,
+      102
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      7,
+      9,
+      107,
+      94
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/crate_empty.png",
+    "dimensions": [
+      99,
+      100
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      6,
+      9,
+      94,
+      91
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/sack_burlap.png",
+    "dimensions": [
+      83,
+      108
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      3,
+      8,
+      75,
+      99
+    ]
+  },
+  {
+    "path": "assets/decor/farm_props/wood_wheel.png",
+    "dimensions": [
+      107,
+      115
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      9,
+      9,
+      99,
+      107
+    ]
+  },
+  {
+    "path": "assets/decor/vegetation/grass_flower_rock_patch.png",
+    "dimensions": [
+      184,
+      111
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      8,
+      176,
+      103
+    ]
+  },
+  {
+    "path": "assets/decor/flowers/flower_patch_red.png",
+    "dimensions": [
+      131,
+      103
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      8,
+      8,
+      123,
+      95
+    ]
+  },
+  {
+    "path": "assets/terrain/patches/grass_patch_plain.png",
+    "dimensions": [
+      195,
+      186
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      3,
+      2,
+      193,
+      182
+    ]
+  },
+  {
+    "path": "assets/terrain/patches/grass_patch_daisies.png",
+    "dimensions": [
+      195,
+      187
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      3,
+      3,
+      192,
+      184
+    ]
+  },
+  {
+    "path": "assets/terrain/patches/grass_patch_yellow.png",
+    "dimensions": [
+      193,
+      187
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      3,
+      3,
+      190,
+      184
+    ]
+  },
+  {
+    "path": "assets/terrain/patches/grass_patch_pebbles.png",
+    "dimensions": [
+      195,
+      188
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      3,
+      2,
+      192,
+      185
+    ]
+  },
+  {
+    "path": "assets/terrain/patches/soil_patch.png",
+    "dimensions": [
+      184,
+      183
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      3,
+      3,
+      182,
+      180
+    ]
+  },
+  {
+    "path": "assets/terrain/patches/soil_patch_corner.png",
+    "dimensions": [
+      182,
+      182
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      2,
+      3,
+      180,
+      179
+    ]
+  },
+  {
+    "path": "assets/terrain/grass/grass_base_seamless_512.png",
+    "dimensions": [
+      512,
+      512
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      0,
+      0,
+      512,
+      512
+    ]
+  },
+  {
+    "path": "assets/terrain/grass/grass_flowers_sparse_seamless_512.png",
+    "dimensions": [
+      512,
+      512
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      0,
+      0,
+      512,
+      512
+    ]
+  },
+  {
+    "path": "assets/terrain/grass/grass_pebbles_sparse_seamless_512.png",
+    "dimensions": [
+      512,
+      512
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      0,
+      0,
+      512,
+      512
+    ]
+  },
+  {
+    "path": "assets/terrain/grass/grass_mixed_sparse_seamless_512.png",
+    "dimensions": [
+      512,
+      512
+    ],
+    "mode": "RGBA",
+    "alpha_bbox": [
+      0,
+      0,
+      512,
+      512
+    ]
+  }
+]

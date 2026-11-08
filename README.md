@@ -36,9 +36,15 @@ O mapa deverá reservar espaço para expansão e futuras cadeias produtivas, inc
 
 ## Estado atual
 
-O projeto está na **Fase 1 — Fundação Godot Mobile**. A base executável da Godot, a configuração mobile, a documentação de arquitetura e a orquestração de agentes já estão organizadas. O vertical slice completo ainda precisa ser implementado e validado em dispositivo Android real.
+O protótipo executável usa Godot 4.7.2 com renderizador Mobile. O vertical slice completo ainda precisa de integração de persistência e validação em dispositivo Android real.
 
-O protótipo Godot já inclui uma área contínua de tomate com três tiras de solo de três sulcos cada e sete posições por sulco (63 células), quatro estágios visuais da planta rasteira, semeadura, colheita durante a caminhada, mochila de até sete caixas e depósito 3D de tomates no rodapé do mapa. Cada planta totalmente colhida desaparece. O plantio da próxima safra só é liberado depois que todas as 63 células forem colhidas. As imagens das caixas da mochila foram ampliadas para o dobro da largura anterior e a pilha foi ajustada para permanecer visível na câmera. O depósito descarrega os tomates por proximidade; seu estoque ainda não está ligado ao sistema de save.
+O jogo já inclui uma área contínua de tomate com três tiras de solo de três sulcos cada e nove posições por sulco (81 células), quatro estágios visuais da planta rasteira, semeadura, colheita durante a caminhada e mochila de até sete caixas. Cada planta totalmente colhida desaparece. O plantio da próxima safra só é liberado depois que todas as 81 células forem colhidas. O balcão no rodapé do mapa recebe caixas, clientes compram produtos e o dinheiro fica disponível para coleta. O HUD mostra inventário, dinheiro, nível e missão.
+
+A ambientação ENV-001 aplica grama repetível ao chão e distribui flores, tufos, arbustos, pedras, árvores e objetos rurais com seed fixa. O componente `scripts/world/cozy_environment.gd` preserva os sulcos, os corredores, os obstáculos e o acesso ao balcão. Os 45 PNGs do pacote estão em `assets/terrain/` e `assets/decor/`; a lista completa e o status de cada um estão em [docs/ASSET_CATALOG.md](docs/ASSET_CATALOG.md).
+
+O rio ENV-002 atravessa o lado oeste do mapa, do norte até a saída a sudoeste, com uma ponte de madeira com cordas e uma ponte de pedra com lanternas. Ele não toca os canteiros nem o balcão, bloqueia a passagem fora das pontes e reserva um bolsão a oeste para novas áreas. A água tem animação leve por shader. Arquitetura, colisões e como adicionar segmentos ou pontes: [docs/RIVER_AND_BRIDGES.md](docs/RIVER_AND_BRIDGES.md); testes: [docs/RIVER_BRIDGES_QA.md](docs/RIVER_BRIDGES_QA.md).
+
+Para abrir o jogo, importe a pasta do repositório na Godot 4.7.2 e execute `scenes/world/farm_world.tscn` (cena principal em `project.godot`). Use setas ou joystick virtual para mover o fazendeiro. A grama é aplicada somente ao chão; as texturas de solo de cultivo existentes continuam sobre ela.
 
 O legado foi removido da árvore atual, mas permanece no histórico. Para recuperar um arquivo específico da versão anterior:
 
@@ -193,7 +199,10 @@ godot --headless --path . --script res://tools/farm_smoke.gd
 godot --headless --path . --script res://tools/harvest_smoke.gd
 godot --headless --path . --script res://tools/sales_counter_smoke.gd
 godot --headless --path . --script res://tools/customer_smoke.gd
+godot --headless --path . --script res://tools/environment_smoke.gd
 ```
+
+Para acrescentar decoração, salve o PNG individual na categoria adequada de `assets/decor/`, registre-o em [docs/ASSET_CATALOG.md](docs/ASSET_CATALOG.md), inclua-o na lista apropriada de `CozyEnvironment` e ajuste a densidade exportada. Apenas as quatro imagens `assets/terrain/grass/*seamless_512.png` são usadas como texturas repetíveis; os patches com bordas próprias ficam disponíveis para colocação individual. Consulte [docs/ENVIRONMENT_GUIDELINES.md](docs/ENVIRONMENT_GUIDELINES.md) e [docs/ENVIRONMENT_QA.md](docs/ENVIRONMENT_QA.md).
 
 Os arquivos do ciclo do tomate estão descritos em [assets/crops/tomato/README.md](assets/crops/tomato/README.md). Os resultados desta implementação estão em [docs/evidence/fv-farm-006.md](docs/evidence/fv-farm-006.md).
 
