@@ -42,6 +42,8 @@ O jogo já inclui uma área contínua de tomate com três tiras de solo de três
 
 A ambientação ENV-001 aplica grama repetível ao chão e distribui flores, tufos, arbustos, pedras, árvores e objetos rurais com seed fixa. O componente `scripts/world/cozy_environment.gd` preserva os sulcos, os corredores, os obstáculos e o acesso ao balcão. Os 45 PNGs do pacote estão em `assets/terrain/` e `assets/decor/`; a lista completa e o status de cada um estão em [docs/ASSET_CATALOG.md](docs/ASSET_CATALOG.md).
 
+O rio ENV-002 atravessa o lado oeste do mapa, do norte até a saída a sudoeste, com uma ponte de madeira com cordas e uma ponte de pedra com lanternas. Ele não toca os canteiros nem o balcão, bloqueia a passagem fora das pontes e reserva um bolsão a oeste para novas áreas. A água tem animação leve por shader. Arquitetura, colisões e como adicionar segmentos ou pontes: [docs/RIVER_AND_BRIDGES.md](docs/RIVER_AND_BRIDGES.md); testes: [docs/RIVER_BRIDGES_QA.md](docs/RIVER_BRIDGES_QA.md).
+
 Para abrir o jogo, importe a pasta do repositório na Godot 4.7.2 e execute `scenes/world/farm_world.tscn` (cena principal em `project.godot`). Use setas ou joystick virtual para mover o fazendeiro. A grama é aplicada somente ao chão; as texturas de solo de cultivo existentes continuam sobre ela.
 
 O legado foi removido da árvore atual, mas permanece no histórico. Para recuperar um arquivo específico da versão anterior:

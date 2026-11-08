@@ -1,0 +1,114 @@
+[
+  {
+    "path": "assets/bridges/bridge_stone_lantern.png",
+    "size": [
+      700,
+      542
+    ],
+    "description": "Stone bridge with lanterns, cozy/isometric style."
+  },
+  {
+    "path": "assets/bridges/bridge_wood_rope.png",
+    "size": [
+      720,
+      511
+    ],
+    "description": "Wood bridge with rope posts, cozy/isometric style."
+  },
+  {
+    "path": "assets/bridges/bridge_approach_left.png",
+    "size": [
+      625,
+      434
+    ],
+    "description": "Left grassy bridge approach/ramp with rope posts."
+  },
+  {
+    "path": "assets/bridges/bridge_approach_right.png",
+    "size": [
+      620,
+      410
+    ],
+    "description": "Right grassy bridge approach/ramp with rope posts."
+  },
+  {
+    "path": "assets/river_tiles/river_straight_vertical.png",
+    "size": [
+      247,
+      324
+    ],
+    "description": "Straight vertical river tile with grassy banks."
+  },
+  {
+    "path": "assets/river_tiles/river_pond_endcap_top.png",
+    "size": [
+      281,
+      338
+    ],
+    "description": "Rounded pond/endcap river tile."
+  },
+  {
+    "path": "assets/river_tiles/river_straight_horizontal.png",
+    "size": [
+      591,
+      264
+    ],
+    "description": "Straight horizontal river tile with grassy banks."
+  },
+  {
+    "path": "assets/river_tiles/river_corner_left_up.png",
+    "size": [
+      307,
+      267
+    ],
+    "description": "Curved river corner tile."
+  },
+  {
+    "path": "assets/river_tiles/river_corner_right_up.png",
+    "size": [
+      306,
+      264
+    ],
+    "description": "Curved river corner tile mirrored."
+  },
+  {
+    "path": "assets/river_tiles/river_curve_large_right.png",
+    "size": [
+      628,
+      518
+    ],
+    "description": "Large sweeping river curve tile."
+  },
+  {
+    "path": "assets/river_tiles/river_corner_right_down.png",
+    "size": [
+      306,
+      262
+    ],
+    "description": "Curved river corner tile."
+  },
+  {
+    "path": "assets/river_tiles/river_corner_left_down.png",
+    "size": [
+      301,
+      263
+    ],
+    "description": "Curved river corner tile mirrored."
+  },
+  {
+    "path": "assets/banks/bank_strip_right_flowers.png",
+    "size": [
+      547,
+      165
+    ],
+    "description": "Decorative grassy bank strip with flowers and rocks."
+  },
+  {
+    "path": "assets/banks/bank_strip_left_flowers.png",
+    "size": [
+      520,
+      162
+    ],
+    "description": "Decorative grassy bank strip with flowers and rocks."
+  }
+]
