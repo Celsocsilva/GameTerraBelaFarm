@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/world/river/river_bridge.gd" id="1_bridge"]
+[ext_resource type="Texture2D" path="res://assets/bridges/bridge_stone_lantern.png" id="2_art"]
+
+[node name="BridgeStone" type="Node3D"]
+script = ExtResource("1_bridge")
+bridge_id = "stone"
+art = ExtResource("2_art")
+art_width_m = 7.6
+deck_front_px = PackedVector2Array(205, 415, 330, 310, 450, 250, 560, 215)
+deck_back_px = PackedVector2Array(70, 300, 175, 215, 310, 160, 445, 130)
+arch_height = 0.4
+front_mask_px = PackedVector2Array(200, 235, 335, 235, 335, 280, 450, 215, 560, 170, 570, 90, 665, 90, 670, 250, 640, 300, 640, 440, 560, 470, 450, 450, 335, 470, 335, 520, 200, 520)

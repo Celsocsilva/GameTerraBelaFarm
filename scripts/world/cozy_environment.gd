@@ -53,6 +53,9 @@ const PROPS := [
 ]
 
 var placements: Array[Dictionary] = []
+## Áreas reservadas por outros sistemas (ex.: RiverSystem, ENV-002). Cada item
+## expõe blocks_decoration(point: Vector3, radius: float) -> bool.
+var reserved_areas: Array[Object] = []
 var _farm_size := 0.0
 var _plot_half_width := 0.0
 var _plot_start_z := 0.0
@@ -140,6 +143,9 @@ func is_allowed_position(point: Vector3, radius: float = 0.0) -> bool:
         return false
     if Vector2(point.x + 10.0, point.z - 10.0).length() < 2.7 + radius:
         return false
+    for area in reserved_areas:
+        if is_instance_valid(area) and area.blocks_decoration(point, radius):
+            return false
     # Espaço de expansão ao norte do mapa, sem decoração sólida.
     if point.z < -23.0 and radius > 0.7:
         return false

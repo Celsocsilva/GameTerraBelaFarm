@@ -29,6 +29,8 @@ const FARM_HUD_SCENE := preload("res://scenes/ui/hud/FarmHUD.tscn")
 const PLAYER_LEVEL_SCRIPT := preload("res://scripts/progression/player_level.gd")
 const MISSION_TRACKER_SCRIPT := preload("res://scripts/progression/mission_tracker.gd")
 const COZY_ENVIRONMENT_SCRIPT := preload("res://scripts/world/cozy_environment.gd")
+## ENV-002: rio modular com ponte de madeira e ponte de pedra (lado oeste).
+const RIVER_SYSTEM_SCENE := preload("res://scenes/world/river/RiverSystem.tscn")
 
 ## Mochila nas costas do fazendeiro (a frente do fazendeiro é -Z local).
 const BACKPACK_OFFSET := Vector3(0.0, 1.1, 0.62)
@@ -79,6 +81,7 @@ var hud: FarmHUD
 var player_level: PlayerLevel
 var mission_tracker: MissionTracker
 var cozy_environment: CozyEnvironment
+var river_system: RiverSystem
 
 func _ready() -> void:
     var texture_size := SOIL_TEXTURE.get_size()
@@ -90,6 +93,7 @@ func _ready() -> void:
     _build_planting_area()
     _build_planting_grid()
     _build_obstacles()
+    _build_river()
     _build_camera()
     _build_harvest()
     _build_sales_counter()
@@ -111,9 +115,19 @@ func _process(delta: float) -> void:
 func get_farmer_hands_position() -> Vector3:
     return farmer.global_transform * HANDS_OFFSET
 
+## Rio, pontes e bloqueio da água (ENV-002). Montado antes da decoração para
+## que a máscara do rio mantenha flores, pedras e árvores fora da água,
+## das margens ilustradas e do caminho das pontes.
+func _build_river() -> void:
+    river_system = RIVER_SYSTEM_SCENE.instantiate() as RiverSystem
+    river_system.name = "RiverSystem"
+    add_child(river_system)
+
 func _build_cozy_environment() -> void:
     cozy_environment = COZY_ENVIRONMENT_SCRIPT.new() as CozyEnvironment
     cozy_environment.name = "CozyEnvironment"
+    if river_system:
+        cozy_environment.reserved_areas.append(river_system)
     add_child(cozy_environment)
     cozy_environment.setup(
         $Ground/GrassSurface as MeshInstance3D,

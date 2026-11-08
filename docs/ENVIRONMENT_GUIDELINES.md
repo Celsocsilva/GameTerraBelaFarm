@@ -42,3 +42,14 @@ Na cena inicial, `placement_seed = 1701` produz 163 instâncias: 70 flores, 61 t
 ## Verificação de integração
 
 Na cena Godot, inspecione em escala de mobile e desktop: repetição das quatro texturas de grama; bordas dos seis patches; escala e alpha dos sprites; visibilidade de todas as células; passagem nas rotas de plantio, colheita, balcão e dinheiro; oclusão na frente e atrás do fazendeiro; e espaço livre para expansão. O QA do ZIP verifica dimensões e alpha, mas não valida essas condições em execução.
+
+## Rio e pontes (ENV-002)
+
+1. O rio é montado só com os tiles do pacote, em escala uniforme. Não estique nem gire tiles, margens ou pontes: a arte tem luz vinda do alto à esquerda e borda de terra voltada para a câmera.
+2. Em cada junção use a peça complementar automática (fatia do reto com esmaecimento); não deixe a margem arredondada nem a borda clara de um PNG aparecer. Confira com `tools/river_capture.gd -- --view=focus --focus=x,z --size=6`.
+3. Faixas de margem (`bank_strip_*`) só em margens horizontais, com a borda de terra da faixa alinhada à borda de terra do tile. Use poucas: hoje são 3 em ~35 m de margem horizontal.
+4. Decoração aleatória fica fora do rio, das margens ilustradas, das pontes, dos acessos e de 2,2 m ao redor das cabeceiras (`RiverSystem.blocks_decoration`, aplicado automaticamente pelo `CozyEnvironment`).
+5. Nada sólido sobre o caminho das pontes. Novas pontes ficam em trechos retos, com as duas cabeceiras em terra firme e identidade própria (madeira com corda, pedra com lanternas).
+6. O bolsão a oeste do rio é reservado para novos terrenos; abra-o por fase sem mudar a mecânica de desbloqueio atual.
+
+Detalhes técnicos e procedimentos: [RIVER_AND_BRIDGES.md](RIVER_AND_BRIDGES.md).

@@ -75,3 +75,26 @@ As listas `FLOWERS`, `TUFTS`, `ROCKS`, `BUSHES`, `TREES` e `PROPS` são fontes d
 - `sign_wood_blank.png` fica **reservado** para identificação futura que ainda não foi definida na cena. Os demais itens fora das listas e do shader ficam **disponíveis**; nenhuma outra destinação exclusiva foi confirmada.
 - O solo funcional continua em `assets/textures/soil/plowed_soil_three_furrows.png`. `soil_patch.png` e `soil_patch_corner.png` não representam células cultiváveis.
 - As dimensões e o alpha do pacote foram verificados no QA do ZIP e de novo na importação Godot. As capturas desktop e os testes automatizados estão em [ENVIRONMENT_QA.md](ENVIRONMENT_QA.md); o percurso completo em dispositivo mobile ainda está pendente.
+
+# Catálogo de assets do rio e das pontes — ENV-002
+
+Fonte: `TerraBelaFarm_Rio_e_Pontes_v1.zip` (`docs/manifest.json` e `docs/README.md`, copiados para `docs/references/env-002/`). Os 14 PNGs foram instalados com os mesmos nomes e caminhos do pacote e conferidos por SHA-256 contra o ZIP (14/14 idênticos). As pranchas `previews/*.png` não foram importadas para o jogo. Todos são RGBA com transparência e são exibidos com escala uniforme (sem distorcer água, flores ou pedras); a única correção é o fator 1/sin 45° em Z usado em todo sprite deitado no chão.
+
+| Caminho | Dimensões (px) | Uso em runtime | Tamanho no mundo (largura) | Status |
+|---|---:|---|---:|---|
+| `assets/river_tiles/river_straight_horizontal.png` | 591 × 264 | Braço norte (recortado na borda oeste) e saída sul (recortada); fatia do meio usada nas junções horizontais | 11,4 m e 1,4 m (recortes) | aplicado |
+| `assets/river_tiles/river_straight_vertical.png` | 247 × 324 | Dois segmentos do trecho das pontes; fatia do meio usada nas junções verticais | 5,9–6,1 m | aplicado |
+| `assets/river_tiles/river_corner_left_up.png` | 307 × 267 | Curva do braço norte para o sul | 9,4 m | aplicado |
+| `assets/river_tiles/river_corner_right_down.png` | 306 × 262 | Curva do trecho vertical para o oeste | 9,2 m | aplicado |
+| `assets/river_tiles/river_curve_large_right.png` | 628 × 518 | Curva grande antes da saída sul | 11,2 m | aplicado |
+| `assets/river_tiles/river_corner_left_down.png` | 301 × 263 | Disponível para expansão (aberturas topo/direita); usada no teste G | — | disponível |
+| `assets/river_tiles/river_corner_right_up.png` | 306 × 264 | Disponível para expansão (aberturas base/direita) | — | disponível |
+| `assets/river_tiles/river_pond_endcap_top.png` | 281 × 338 | Lago terminal (só abertura superior); usado no teste G | — | disponível |
+| `assets/banks/bank_strip_left_flowers.png` | 520 × 162 | Margem sul do braço norte | 3,6 m | aplicado |
+| `assets/banks/bank_strip_right_flowers.png` | 547 × 165 | Margem norte do braço norte e margem da curva sul | 3,2–3,4 m | aplicado |
+| `assets/bridges/bridge_wood_rope.png` | 720 × 511 | `BridgeWood.tscn` | 8,0 m | aplicado |
+| `assets/bridges/bridge_stone_lantern.png` | 700 × 542 | `BridgeStone.tscn` | 7,6 m | aplicado |
+| `assets/bridges/bridge_approach_left.png` | 625 × 434 | Acesso oeste da ponte de madeira (postes com colisão) | 7,6 m | aplicado |
+| `assets/bridges/bridge_approach_right.png` | 620 × 410 | Acesso leste da ponte de madeira (postes com colisão) | 7,6 m | aplicado |
+
+Arquivos derivados (não alteram os PNGs): `data/river/river_tile_meta.json` (aberturas e máscara de água, gerado por `tools/river_tile_bake.gd`), `assets/river_tiles/river_water*.gdshader*` (água animada e junções) e `assets/bridges/bridge_front_layer.gdshader` (camada frontal das pontes). Arquitetura, colisões e expansão em [RIVER_AND_BRIDGES.md](RIVER_AND_BRIDGES.md).
