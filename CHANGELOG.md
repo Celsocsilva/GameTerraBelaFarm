@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- FV-SHOP-001: botão Loja agora abre modal navegável com 5 categorias e 15 ofertas conceituais; UI traduzível PT/ES/EN; sem preços, SKUs ou checkout fictícios. Compra desabilitada até integração segura de IAP e validação de recebimentos. Testes em `tools/shop_smoke.gd` e documentação em `docs/IAP_SHOP.md`.
+
 - FV-STACK-001: banca de vendas de volta à arte plana (`assets/sales/stall_market_gingham.png`; a versão funda fica guardada sem uso), caixas sobre a toalha; no balcão e na parcela de 10% as caixas formam UMA única pilha por cultura (`CrateStack`: tomate no meio, milho à esquerda, abóbora à direita), altura visual limitada (4 no balcão, 5 na parcela) e contador "xN" acima da pilha quando passa do limite. Contagem lógica, colisão, fila, dinheiro e distância do terreno inalterados. Teste `tools/crate_stack_smoke.gd`, evidências em `docs/evidence/fv-stack-001/`.
 
 - FV-HELPER-001: ajudante contratado por uma plataforma no chão (paga dinheiro a dinheiro, 100 para contratar e 5 graus), colhe, empilha caixas na parcela de 10% e replanta; o fazendeiro recolhe a pilha pisando na parcela. Teste `tools/helper_smoke.gd`, evidências em `docs/evidence/fv-helper-001/`.
