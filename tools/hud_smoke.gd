@@ -161,9 +161,17 @@ func _run() -> void:
         if shown != pair[1] or caption.text != "STORE_LABEL" or width > caption.size.x:
             return _fail("rótulo da loja em %s: '%s' (largura %.0f/%.0f)" % [pair[0], shown, width, caption.size.x])
         print("STORE_LABEL %s=%s font=%d" % [pair[0], shown, caption.get_theme_font_size("font_size")])
+    var shop_balance_before := world.wallet.get_balance()
     hud.store_button.pressed.emit()
-    if hud.get_banner_message() != "Loja em breve!":
-        return _fail("loja")
+    if hud.shop_modal == null or not hud.shop_modal.is_shop_open():
+        return _fail("botão da loja não abriu a modal")
+    if hud.shop_modal.get_selected_product_id() != "speed_growth":
+        return _fail("produto inicial da loja")
+    if world.wallet.get_balance() != shop_balance_before:
+        return _fail("abrir loja modificou saldo")
+    hud.shop_modal.close_shop()
+    if hud.shop_modal.is_shop_open():
+        return _fail("modal não fechou")
 
     # 8b. Modal de recompensa (UI-REWARD-001): chaves de ui.csv nos 3 idiomas e
     # textos (normais e longos) sempre dentro das áreas internas do cartão.
