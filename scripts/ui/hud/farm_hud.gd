@@ -38,6 +38,8 @@ const FULL_BACKPACK_MESSAGE := "Mochila cheia! Leve as caixas ao Balcão de vend
 @onready var store_button: StoreButton = $Root/StoreButton
 @onready var sale_popups: Control = $Root/SalePopups
 @onready var reward_popup: RewardPopup = $Root/RewardPopup
+## Modal grande para avisos e explicações (UI-MESSAGE-001); o RewardPopup fica só para recompensas.
+@onready var message_popup: MessagePopup = $Root/MessagePopup
 
 var wallet: Wallet
 var inventory: HarvestInventory
@@ -168,7 +170,8 @@ func _on_inventory_changed(_item: StringName, _amount: int) -> void:
     _update_inventory(true)
 
 func _update_inventory(animate: bool) -> void:
-    tomato_counter.set_ratio(inventory.get_total(), inventory.get_capacity(), animate)
+    # FV-WOOD-001: o contador de tomates conta só tomates (toras não entram).
+    tomato_counter.set_ratio(inventory.get_amount(HarvestInventory.DEFAULT_ITEM), inventory.get_capacity(), animate)
     crate_counter.set_ratio(inventory.get_crate_count(), inventory.max_crates, animate)
     if inventory.is_full():
         info_banner.show_message(FULL_BACKPACK_MESSAGE)
@@ -210,6 +213,12 @@ func _on_reward_collected(_amount: int) -> void:
 func _on_store_pressed() -> void:
     store_pressed.emit()
     show_banner("Loja em breve!", 1.6)
+
+## Modal grande (moldura com laço vermelho). Textos curtos: título de 1 a 2
+## palavras e 1 a 2 frases. Aceita chaves de localization/ui.csv.
+func show_message(title: String, message: String, button_text: String = MessagePopup.DEFAULT_BUTTON) -> MessagePopup:
+    message_popup.show_message(title, message, button_text)
+    return message_popup
 
 ## Mensagem temporária na faixa floral.
 func show_banner(text: String, seconds: float) -> void:

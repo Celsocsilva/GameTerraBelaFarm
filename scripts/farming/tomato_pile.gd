@@ -34,8 +34,16 @@ const PICKUP_INTERVAL := 0.12
 
 @export_range(1, 64, 1) var units_per_crate: int = 8
 @export var item_id: StringName = &"tomato"
+## Áreas de estoque próprias de uma cultura (milho, abóbora): a pilha fica no
+## meio da parcela em vez do deslocamento por cultura (CrateStack.slot_x).
+@export var centered: bool = false
 ## Folga além da borda da parcela em que o fazendeiro ainda recolhe.
 @export_range(0.0, 2.0, 0.05) var pickup_margin: float = 0.4
+## FV-WOOD-001: a mesma pilha serve a outros itens (ex.: fardos de madeira no
+## balcão). Largura do caixote e capacidade lógica são ajustáveis; a arte vem
+## de ItemArt pelo item_id.
+@export_range(0.3, 3.0, 0.01) var crate_width: float = CRATE_WIDTH
+@export_range(1, 999, 1) var max_crates: int = MAX_CRATES
 
 ## Pegada XZ da parcela (mundo).
 var rect := Rect2()
@@ -66,7 +74,7 @@ func _ready() -> void:
         crate.position = _slot_local(index)
         crate.visible = false
         add_child(crate)
-        var sprite := _make_crate_sprite(CRATE_FULL_TEXTURE)
+        var sprite := _make_crate_sprite(ItemArt.full_texture(item_id))
         sprite.name = "CrateSprite"
         sprite.render_priority = index
         crate.add_child(sprite)
@@ -80,7 +88,7 @@ func _process(delta: float) -> void:
     _orient_sprites()
 
 func get_capacity() -> int:
-    return MAX_CRATES * units_per_crate
+    return max_crates * units_per_crate
 
 func get_stored_total() -> int:
     return _stored
@@ -180,7 +188,8 @@ func _refresh() -> void:
         var crate := _crates[index]
         crate.visible = index < shown and not _in_flight.has(index)
         var sprite := crate.get_node("CrateSprite") as Sprite3D
-        var texture: Texture2D = CRATE_EMPTY_TEXTURE if partial and index == shown - 1 else CRATE_FULL_TEXTURE
+        var top_units := _stored - (count - 1) * units_per_crate
+        var texture: Texture2D = ItemArt.partial_texture(item_id, top_units, units_per_crate) if partial and index == shown - 1 else ItemArt.full_texture(item_id)
         if sprite.texture != texture:
             _apply_texture(sprite, texture)
     if _count_label:
@@ -194,11 +203,13 @@ func _slot_local(index: int) -> Vector3:
     var layer := CrateStack.visual_index(index, VISUAL_MAX)
     var spacing := STACK_SPACING
     if rect.size.x > 0.0:
-        spacing = minf(spacing, (rect.size.x - CRATE_WIDTH) * 0.5)
-    return Vector3(CrateStack.slot_x(item_id, spacing), float(layer) * LAYER_STEP, float(layer) * 0.03)
+        spacing = minf(spacing, (rect.size.x - crate_width) * 0.5)
+    var x := 0.0 if centered else CrateStack.slot_x(item_id, spacing)
+    return Vector3(x, float(layer) * crate_width * 0.54, float(layer) * 0.03)
 
 func _count_label_local() -> Vector3:
-    var crate_height := CRATE_WIDTH * float(CRATE_FULL_TEXTURE.get_height()) / float(CRATE_FULL_TEXTURE.get_width())
+    var art := ItemArt.full_texture(item_id)
+    var crate_height := crate_width * float(art.get_height()) / float(art.get_width())
     var stretch := 1.0 / cos(deg_to_rad(VIEW_PITCH_DEGREES))
     return _slot_local(VISUAL_MAX - 1) + Vector3(0.0, crate_height * stretch + 0.35, 0.2)
 
@@ -212,7 +223,7 @@ func _launch(index: int, from: Vector3, to: Vector3, delay: float, kind: String,
     add_child(flyer)
     flyer.global_position = from
     flyer.set_meta("grow", 1.0 if kind == "pickup" else 0.7)
-    var sprite := _make_crate_sprite(CRATE_FULL_TEXTURE)
+    var sprite := _make_crate_sprite(ItemArt.full_texture(item_id))
     sprite.name = "CrateSprite"
     sprite.render_priority = VISUAL_MAX + 1
     flyer.add_child(sprite)
@@ -299,5 +310,5 @@ func _make_crate_sprite(texture: Texture2D) -> Sprite3D:
 
 func _apply_texture(sprite: Sprite3D, texture: Texture2D) -> void:
     sprite.texture = texture
-    sprite.pixel_size = CRATE_WIDTH / float(texture.get_width())
+    sprite.pixel_size = crate_width * ItemArt.width_scale(item_id) / float(texture.get_width())
     sprite.offset = Vector2(-texture.get_width() * 0.5, 0.0)

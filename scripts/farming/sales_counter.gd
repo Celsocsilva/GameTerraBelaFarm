@@ -23,6 +23,8 @@ class_name SalesCounter
 
 signal deposited(units: int, stored_total: int)
 signal stock_taken(units: int, stored_total: int)
+## FV-WOOD-001: depósito de um item extra (ex.: toras de madeira).
+signal item_deposited(item: StringName, units: int, stored_total: int)
 
 ## Altura visual máxima da pilha (caixas); o resto vira o contador "xN".
 const MAX_VISUAL_CRATES := 4
@@ -46,6 +48,11 @@ const JUMP_HEIGHT := 1.6 * COUNTER_SCALE
 ## Tampo do balcão: 8,5 m de largura e fundo para 2 caixas, uma na frente da outra.
 const COUNTER_SIZE := Vector3(8.5 * COUNTER_SCALE, 0.16, 2.25 * COUNTER_SCALE)
 const BARRIER_HEIGHT := 0.7
+## FV-WOOD-001 / CROP-CORN-001: posição X (local) da pilha de cada item extra
+## vendido no balcão. O milho ocupa a vaga da esquerda reservada a ele em
+## CrateStack; a madeira passou para a vaga da direita (da abóbora, que ainda
+## não é vendida).
+const EXTRA_SLOT_X := {&"corn": -STACK_SPACING, &"wood": STACK_SPACING}
 ## Arte da banca de feira plana (toalha xadrez vermelha) — FV-STACK-001.
 const STALL_TEXTURE := preload("res://assets/sales/stall_market_gingham.png")
 ## Largura da arte na cena: a mesma do balcão (a colisão não muda).
@@ -64,6 +71,9 @@ const VIEW_PITCH_DEGREES := 45.0
 @export var item_id: StringName = &"tomato"
 ## Cercas baixas das pontas do balcão até as laterais do terreno.
 @export var build_side_barriers: bool = true
+## FV-WOOD-001: outros itens que o fazendeiro descarrega aqui, cada um na sua
+## pilha (TomatoPile reaproveitada, com a arte de ItemArt).
+@export var extra_items: Array[StringName] = [&"corn", &"wood"]
 
 ## Registro para testes: um item por caixa que pulou {"index", "from", "to"}.
 var jump_log: Array[Dictionary] = []
@@ -78,6 +88,8 @@ var _camera: Camera3D
 var _in_flight: Dictionary = {}
 var _count_label: Label3D
 var _flyers: Array[Node3D] = []
+## item -> TomatoPile com o estoque desse item no balcão.
+var _extra_stacks: Dictionary = {}
 
 func _ready() -> void:
     _body = StaticBody3D.new()
@@ -97,6 +109,22 @@ func _ready() -> void:
     _count_label.position = _count_label_local()
     add_child(_count_label)
     set_displayed_crates(initial_displayed_crates)
+    _build_extra_stacks()
+
+func _build_extra_stacks() -> void:
+    for item in extra_items:
+        if item == item_id or _extra_stacks.has(item):
+            continue
+        var stack := TomatoPile.new()
+        stack.name = "CounterStack_%s" % String(item).capitalize()
+        stack.item_id = item
+        stack.centered = true
+        stack.units_per_crate = units_per_crate
+        stack.crate_width = CRATE_WIDTH
+        stack.max_crates = 999
+        stack.position = Vector3(float(EXTRA_SLOT_X.get(item, -STACK_SPACING)), get_crate_base_height(), 0.0)
+        add_child(stack)
+        _extra_stacks[item] = stack
 
 ## Banca de feira com toalha xadrez (FV-PROPS-001): a arte inteira num único
 ## quadro inclinado que vai do chão na frente do balcão (+Z, lado dos clientes)
@@ -182,9 +210,10 @@ func process_farmer_position(world_pos: Vector3, hands_pos: Variant = null) -> v
 func deposit_from(inventory: HarvestInventory, hands_pos: Variant = null) -> int:
     if inventory == null or not is_instance_valid(inventory):
         return 0
+    var extra := _deposit_extras(inventory, hands_pos)
     var carried := inventory.get_amount(item_id)
     if carried <= 0:
-        return 0
+        return extra
     var removed := inventory.remove(item_id, carried)
     var before := _displayed_crates
     _stored_total += removed
@@ -194,7 +223,62 @@ func deposit_from(inventory: HarvestInventory, hands_pos: Variant = null) -> int
             _launch_crate(index, hands_pos, float(index - before) * JUMP_STAGGER)
     if removed > 0:
         deposited.emit(removed, _stored_total)
-    return removed
+    return removed + extra
+
+## Itens extras carregados (ex.: madeira) vão para a pilha própria, com os
+## fardos pulando das mãos como as caixas de tomate.
+func _deposit_extras(inventory: HarvestInventory, hands_pos: Variant) -> int:
+    var total := 0
+    for item in _extra_stacks:
+        var carried := inventory.get_amount(item)
+        if carried <= 0:
+            continue
+        var removed := inventory.remove(item, carried)
+        var stack := _extra_stacks[item] as TomatoPile
+        stack.add_units(removed, hands_pos if hands_pos is Vector3 and is_inside_tree() else null)
+        total += removed
+        item_deposited.emit(item, removed, stack.get_stored_total())
+    return total
+
+## Pilha de um item extra no balcão (null se o item não é vendido aqui).
+func get_extra_stack(item: StringName) -> TomatoPile:
+    return _extra_stacks.get(item) as TomatoPile
+
+## Estoque (unidades) de qualquer item vendido no balcão.
+func get_item_total(item: StringName) -> int:
+    if item == item_id:
+        return _stored_total
+    var stack := get_extra_stack(item)
+    return stack.get_stored_total() if stack else 0
+
+func get_item_stock_crates(item: StringName) -> int:
+    return int(ceil(float(get_item_total(item)) / float(units_per_crate)))
+
+## Retira estoque de qualquer item para uma venda. Nunca negativo.
+func take_item_units(item: StringName, units: int) -> int:
+    if item == item_id:
+        return take_units(units)
+    var stack := get_extra_stack(item)
+    return stack.take_units(units) if stack else 0
+
+func set_item_total(item: StringName, total: int) -> void:
+    if item == item_id:
+        set_stored_total(total)
+    elif get_extra_stack(item):
+        get_extra_stack(item).set_stored_total(total)
+
+## Itens com estoque agora, o principal (tomate) primeiro.
+func get_stocked_items() -> Array[StringName]:
+    var items: Array[StringName] = []
+    if _stored_total > 0:
+        items.append(item_id)
+    for item in _extra_stacks:
+        if (_extra_stacks[item] as TomatoPile).get_stored_total() > 0:
+            items.append(item)
+    return items
+
+func has_any_stock() -> bool:
+    return not get_stocked_items().is_empty()
 
 ## Retira estoque para uma venda. Nunca deixa estoque negativo.
 func take_units(units: int) -> int:
@@ -332,6 +416,8 @@ func _squash(amount: float, crate: Node3D) -> void:
 
 ## Termina todos os pulos na hora (testes e capturas).
 func finish_jumps() -> void:
+    for stack in _extra_stacks.values():
+        (stack as TomatoPile).finish_jumps()
     for flyer in _flyers:
         if is_instance_valid(flyer):
             flyer.queue_free()
@@ -368,25 +454,24 @@ func _orient_sprites() -> void:
             var grow: float = flyer.get_meta("grow", 1.0)
             (flyer.get_node("CrateSprite") as Node3D).global_basis = Basis(basis.x * grow, basis.y * grow, basis.z)
 
-## Cercas baixas (sólidas) das pontas do balcão até as laterais do terreno, na
+## Cercas (sólidas) das pontas do balcão até as laterais do terreno, na
 ## linha central do balcão. Os clientes não têm física e não são afetados.
 func _build_barriers() -> void:
     var half := get_half_extents()
     var span := _farm_size * 0.5 - half.x
     if span <= 0.05:
         return
-    var wood := _material(Color(0.62, 0.40, 0.18))
     for side in [-1.0, 1.0]:
         var barrier := StaticBody3D.new()
         barrier.name = "CounterBarrier_%s" % ("L" if side < 0.0 else "R")
         barrier.position = Vector3(side * (half.x + span * 0.5), 0.0, 0.0)
         add_child(barrier)
-        _add_box(barrier, "Rail", Vector3(span, 0.12, 0.12), Vector3(0.0, BARRIER_HEIGHT - 0.06, 0.0), wood)
-        _add_box(barrier, "RailLow", Vector3(span, 0.1, 0.1), Vector3(0.0, BARRIER_HEIGHT * 0.45, 0.0), wood)
-        var posts := int(ceil(span / 2.0))
-        for post in posts + 1:
-            var x := -span * 0.5 + span * float(post) / float(posts)
-            _add_box(barrier, "Post", Vector3(0.16, BARRIER_HEIGHT, 0.16), Vector3(x, BARRIER_HEIGHT * 0.5, 0.0), wood)
+        # ENV-FENCE-001: a cerca usa a arte de madeira do projeto (FenceRun),
+        # com postes nas pontas e vãos iguais; a colisão abaixo não mudou.
+        var fence := FenceRun.new()
+        fence.name = "Fence"
+        fence.length = span
+        barrier.add_child(fence)
         var collision := CollisionShape3D.new()
         var shape := BoxShape3D.new()
         shape.size = Vector3(span, 1.6, 0.3)

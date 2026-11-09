@@ -11,7 +11,8 @@ signal amount_changed(item_id: StringName, amount: int)
 signal crate_filled(crate_index: int)
 signal backpack_full()
 
-## Item único por enquanto; a mochila aceita só uma cultura por vez.
+## Item padrão. A mochila aceita só um produto por vez (FV-WOOD-001: tomate
+## OU toras de madeira); can_accept() diz se outro produto já ocupa a mochila.
 const DEFAULT_ITEM := &"tomato"
 
 @export_range(1, 7, 1) var max_crates: int = 7
@@ -70,12 +71,23 @@ func get_crate_count() -> int:
 func get_full_crate_count() -> int:
     return mini(max_crates, get_total() / units_per_crate)
 
+## Verdadeiro se nenhum OUTRO produto está na mochila ou a caminho dela.
+func can_accept(item_id: StringName) -> bool:
+    for key in _amounts:
+        if key != item_id and int(_amounts[key]) > 0:
+            return false
+    for reservation in _reservations.values():
+        if (reservation as Reservation).item_id != item_id and (reservation as Reservation).pending() > 0:
+            return false
+    return true
+
 ## Reserva até `amount` unidades. Retorna uma reserva inválida (amount 0) se não
-## houver espaço; nunca reserva além da capacidade livre.
+## houver espaço ou se outro produto ocupa a mochila; nunca reserva além da
+## capacidade livre.
 func try_reserve(item_id: StringName, amount: int) -> Reservation:
     var reservation := Reservation.new()
     reservation.item_id = item_id
-    reservation.amount = mini(maxi(amount, 0), get_free_capacity())
+    reservation.amount = mini(maxi(amount, 0), get_free_capacity()) if can_accept(item_id) else 0
     if reservation.amount <= 0:
         reservation.amount = 0
         return reservation

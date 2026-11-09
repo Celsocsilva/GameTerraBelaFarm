@@ -5,6 +5,8 @@ signal stage_changed(cell_id: String, stage: String)
 signal ready_for_harvest(cell_id: String)
 
 @export var cell_id: String = ""
+## CROP-CORN-001: cultura da planta (arte dos estágios vem de CropCatalog).
+@export var crop_id: StringName = &"tomato"
 @export var accelerated_test_mode: bool = true
 ## Ciclo completo (broto -> pronto); dobrado de 30 s para 60 s.
 @export var growth_duration: float = 60.0
@@ -44,7 +46,7 @@ func initialize(new_cell_id: String, timestamp: float) -> void:
 	cell_id = new_cell_id
 	planted_at = timestamp
 	sprite = Sprite3D.new()
-	sprite.name = "TomatoPlantSprite"
+	sprite.name = "TomatoPlantSprite" if crop_id == &"tomato" else "%sPlantSprite" % String(crop_id).capitalize()
 	sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	sprite.shaded = false
 	sprite.double_sided = true
@@ -69,6 +71,10 @@ func _process(_delta: float) -> void:
 	if next_index != stage_index:
 		_update_stage(next_index)
 
+## Arte dos estágios desta cultura (tomate: STAGE_ASSETS).
+func get_stage_assets() -> Array:
+	return STAGE_ASSETS if crop_id == &"tomato" else CropCatalog.stage_assets(crop_id)
+
 ## Tamanho visível da planta no mundo (largura, altura) no estágio atual.
 func get_visible_world_size() -> Vector2:
 	if sprite == null or sprite.texture == null:
@@ -78,8 +84,9 @@ func get_visible_world_size() -> Vector2:
 func _update_stage(new_index: int) -> void:
 	var previous_index := stage_index
 	stage_index = clampi(new_index, 0, STAGES.size() - 1)
-	var texture := load(STAGE_ASSETS[stage_index]) as Texture2D
-	var region := _visible_rect(STAGE_ASSETS[stage_index], texture)
+	var assets := get_stage_assets()
+	var texture := load(assets[stage_index]) as Texture2D
+	var region := _visible_rect(assets[stage_index], texture)
 	sprite.texture = texture
 	sprite.region_rect = region
 	# Escala pelo conteúdo opaco (não pelo PNG inteiro com margens), limitada

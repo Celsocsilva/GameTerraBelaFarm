@@ -110,6 +110,9 @@ func request_collect(cell_id: String) -> bool:
     fx.duration_min = flight_duration_min
     fx.duration_max = flight_duration_max
     fx.arc_height = float(cell["cell_width"]) * arc_height_factor
+    if item_id != &"tomato":
+        fx.fruit_texture = CropCatalog.fruit_texture(item_id)
+        fx.fruit_height = CropCatalog.fruit_height(item_id)
     var job := {
         "cell_id": cell_id,
         "reservation": reservation,

@@ -27,6 +27,8 @@ const SPARK_TEXTURE := preload("res://assets/harvest/harvest_pickup_spark.png")
 @export var use_spark: bool = true
 ## Altura mínima do mundo para qualquer fruto: nunca abaixo do terreno.
 @export var min_world_y: float = 0.12
+## CROP-CORN-001: arte do fruto (null = tomate). O milho voa como espiga.
+var fruit_texture: Texture2D
 
 var _fruits: Array[Dictionary] = []
 var _intake: Node3D
@@ -45,7 +47,8 @@ func launch(origins: Array[Vector3], intake: Node3D) -> void:
     var rng := RandomNumberGenerator.new()
     rng.seed = hash(origins)
     for i in origins.size():
-        var sprite := _make_sprite(TOMATO_TEXTURE, fruit_height / float(TOMATO_TEXTURE.get_height()))
+        var art: Texture2D = fruit_texture if fruit_texture else TOMATO_TEXTURE
+        var sprite := _make_sprite(art, fruit_height / float(art.get_height()))
         sprite.name = "PickupTomato_%d" % i
         sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_OPAQUE_PREPASS
         sprite.render_priority = 2
