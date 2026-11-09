@@ -12,6 +12,7 @@ class_name FarmHUD
 signal store_pressed()
 
 const SALE_POPUP_SCENE := preload("res://scenes/ui/hud/components/SalePopup.tscn")
+const SHOP_MODAL_SCENE := preload("res://scenes/ui/shop/FarmShopModal.tscn")
 const MARGIN := 16.0
 ## Tamanho do SalePopup.tscn (field_input_wide.png v5).
 const SALE_POPUP_SCENE_SIZE := Vector2(559, 139)
@@ -45,10 +46,13 @@ var player_level: PlayerLevel
 var missions: MissionTracker
 var _banner_timer: SceneTreeTimer
 var _ui_scale := 1.0
+var shop_modal: FarmShopModal
 
 func _ready() -> void:
     root_control.resized.connect(layout)
     store_button.pressed.connect(_on_store_pressed)
+    shop_modal = SHOP_MODAL_SCENE.instantiate() as FarmShopModal
+    root_control.add_child(shop_modal)
     reward_popup.collected.connect(_on_reward_collected)
     layout()
 
@@ -209,7 +213,8 @@ func _on_reward_collected(_amount: int) -> void:
 
 func _on_store_pressed() -> void:
     store_pressed.emit()
-    show_banner("Loja em breve!", 1.6)
+    if shop_modal:
+        shop_modal.open_shop()
 
 ## Mensagem temporária na faixa floral.
 func show_banner(text: String, seconds: float) -> void:
