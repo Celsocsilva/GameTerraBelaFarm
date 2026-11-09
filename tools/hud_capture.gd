@@ -147,11 +147,16 @@ func _capture_store(out_dir: String, prefix: String) -> void:
         detail.resize(detail.get_width() * 3, detail.get_height() * 3, Image.INTERPOLATE_LANCZOS)
         detail.save_png(out_dir.path_join("loja-%s-%s-zoom.png" % [tag, locale]))
     TranslationServer.set_locale("pt_BR")
-    # Clique real no botão: mostra o aviso.
+    # Clique real no botão: mostra a modal navegável (sem compras reais).
     world.hud.store_button.pressed.emit()
     await create_timer(0.3).timeout
-    print("CAPTURE_STORE_CLICK banner=%s" % world.hud.get_banner_message())
-    await _shot(out_dir, "loja-%s-clique.png" % tag)
+    print("CAPTURE_STORE_CLICK modal=%s" % world.hud.shop_modal.is_shop_open())
+    await _shot(out_dir, "loja-%s-modal.png" % tag)
+    for category in ["resources", "helpers", "equipment", "bundles"]:
+        world.hud.shop_modal._choose_category(category)
+        await create_timer(0.15).timeout
+        await _shot(out_dir, "loja-%s-%s.png" % [tag, category])
+    world.hud.shop_modal.close_shop()
 
 ## Tela de inspeção dos PNGs: página 1 (oito componentes corrigidos + CTAs) nos
 ## três fundos, páginas 2 e 3 no xadrez.
