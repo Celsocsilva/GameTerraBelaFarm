@@ -31,11 +31,16 @@ var _tab_buttons: Dictionary = {}
 var _category_id := "boosters"
 var _selected_id := ""
 var _layout_width := 0.0
+var _layout_queued := false
 
 func _ready() -> void:
     mouse_filter = Control.MOUSE_FILTER_IGNORE
     _build_ui()
     resized.connect(_layout)
+    # Rótulos com autowrap podem inflar o cartão por um quadro enquanto ainda
+    # não têm largura; o PanelContainer nunca encolhe sozinho, então refazemos
+    # o layout sempre que o mínimo do conteúdo muda.
+    _card.minimum_size_changed.connect(_queue_layout)
     visible = false
     _translate_and_populate()
     _layout()
@@ -50,6 +55,7 @@ func open_shop() -> void:
     _translate_and_populate()
     visible = true
     _layout()
+    _queue_layout()
     _close_button.grab_focus()
 
 func close_shop() -> void:
@@ -230,6 +236,13 @@ func _translate_and_populate() -> void:
         btn.add_theme_stylebox_override("hover", _style(Color("#ffe0a5"), WOOD, 2, 12))
     _populate_cards()
     _update_details()
+    _queue_layout()
+
+func _queue_layout() -> void:
+    if _layout_queued:
+        return
+    _layout_queued = true
+    call_deferred("_layout")
 
 func _populate_cards() -> void:
     for child in _product_grid.get_children():
@@ -294,10 +307,13 @@ func _update_details() -> void:
     _purchase_button.disabled = true
 
 func _layout() -> void:
+    _layout_queued = false
     if _card == null:
         return
     var width := maxf(260.0, minf(size.x - MIN_MARGIN * 2.0, 1080.0))
     var height := maxf(340.0, minf(size.y - MIN_MARGIN * 2.0, 650.0))
+    # Zera antes para o cartão voltar ao tamanho pedido mesmo que tenha crescido.
+    _card.size = Vector2.ZERO
     _card.size = Vector2(width, height)
     _card.position = (size - _card.size) * 0.5
     _layout_width = width

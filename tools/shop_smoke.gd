@@ -40,6 +40,11 @@ func _run() -> void:
     world.hud.store_button.pressed.emit()
     if not shop.is_shop_open() or shop.get_selected_product_id() != "speed_growth":
         return _fail("abertura pelo botão da loja")
+    await process_frame
+    await process_frame
+    var area := Rect2(Vector2.ZERO, shop.size)
+    if not area.encloses(shop._card.get_rect()):
+        return _fail("cartão da loja sai da tela: %s em %s" % [shop._card.get_rect(), area])
     for category in ShopCatalog.CATEGORIES:
         var id := String(category["id"])
         shop._choose_category(id)
