@@ -14,3 +14,35 @@ CROP_PUMPKIN,Abóbora,Calabaza,Pumpkin
 REWARD_TITLE,Recompensa!,¡Recompensa!,Reward!
 REWARD_MISSION_COMPLETE,Missão concluída!,¡Misión completada!,Quest complete!
 REWARD_COLLECT,Coletar,Recoger,Collect
+SHOP_TITLE,Loja da Fazenda,Tienda de la Granja,Farm Shop
+SHOP_SUBTITLE,Packs e recursos especiais,Packs y recursos especiales,Packs and special resources
+SHOP_CLOSE,Fechar loja,Cerrar tienda,Close shop
+SHOP_TAB_BOOSTERS,Aceleradores,Aceleradores,Boosters
+SHOP_TAB_RESOURCES,Recursos,Recursos,Resources
+SHOP_TAB_HELPERS,Assistentes,Asistentes,Helpers
+SHOP_TAB_EQUIPMENT,Máquinas,Máquinas,Machines
+SHOP_TAB_BUNDLES,Pacotes,Paquetes,Bundles
+SHOP_DETAILS,Detalhes,Detalles,Details
+SHOP_UNAVAILABLE,Em breve,Próximamente,Coming soon
+SHOP_PAYMENT_PENDING,Compras indisponíveis até ativar a loja oficial,Compras no disponibles hasta activar la tienda oficial,Purchases unavailable until the official store is enabled
+SHOP_NO_PRODUCTS,Nenhum produto disponível,No hay productos disponibles,No products available
+SHOP_DESC_BOOST,Conceito de acelerador. Duração e efeito serão definidos antes da venda.,Concepto de acelerador. Duración y efecto pendientes de definir.,Booster concept. Duration and effect to be defined before sale.
+SHOP_DESC_RESOURCES,Pacote de insumos. Quantidades serão definidas antes da venda.,Paquete de insumos. Cantidades pendientes de definir.,Resource pack. Quantities to be defined before sale.
+SHOP_DESC_HELPERS,Assistência extra para tarefas da fazenda. Regras ainda em definição.,Ayuda extra para tareas de la granja. Reglas por definir.,Extra help with farm tasks. Rules still to be defined.
+SHOP_DESC_EQUIPMENT,Equipamento para ampliar operações. Funcionalidade ainda em definição.,Equipo para ampliar operaciones. Funciones por definir.,Equipment to extend farm operations. Features still to be defined.
+SHOP_DESC_BUNDLES,Conjunto de benefícios. Conteúdo será definido antes da venda.,Conjunto de beneficios. Contenido por definir.,Benefit bundle. Contents to be defined before sale.
+SHOP_ITEM_GROWTH,Crescimento rápido,Crecimiento rápido,Fast growth
+SHOP_ITEM_HARVEST,Colheita rápida,Cosecha rápida,Fast harvest
+SHOP_ITEM_PRODUCTION,Produção acelerada,Producción acelerada,Faster production
+SHOP_ITEM_SEEDS,Pacote de sementes,Paquete de semillas,Seed pack
+SHOP_ITEM_WOOD,Pacote de madeira,Paquete de madera,Wood pack
+SHOP_ITEM_MATERIALS,Pacote de materiais,Paquete de materiales,Materials pack
+SHOP_ITEM_HELPER_EXTRA,Assistente extra,Asistente adicional,Extra helper
+SHOP_ITEM_HELPER_TEAM,Equipe de assistentes,Equipo de asistentes,Helper team
+SHOP_ITEM_HELPER_UPGRADE,Melhoria de assistente,Mejora de asistente,Helper upgrade
+SHOP_ITEM_IRRIGATOR,Irrigador,Irrigador,Irrigator
+SHOP_ITEM_COLLECTOR,Coletor automático,Recolector automático,Automatic collector
+SHOP_ITEM_CART,Carrinho de transporte,Carro de transporte,Transport cart
+SHOP_ITEM_STARTER,Pacote inicial,Paquete inicial,Starter pack
+SHOP_ITEM_FARMER,Pacote do fazendeiro,Paquete del granjero,Farmer pack
+SHOP_ITEM_SEASON,Pacote de temporada,Paquete de temporada,Season pack
