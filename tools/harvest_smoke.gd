@@ -269,6 +269,9 @@ func _test_walk_harvest_ten_plants() -> void:
         started[cell_id] = true)
     # Desce a tira do meio a 4 m/s, com zigue-zague e giro brusco.
     var path: Array[Vector3] = [Vector3(0.0, 0.0, 2.0), Vector3(0.0, 0.0, 6.5), Vector3(1.3, 0.0, 6.5), Vector3(-1.3, 0.0, 9.0), Vector3(0.0, 0.0, 14.5)]
+    # Caminho escrito para a borda antiga (z = 2,3); acompanha o canteiro (FV-FARM-008).
+    for i in path.size():
+        path[i].z += FarmWorld.PLANTING_NEAR_EDGE_Z - 2.3
     world.farmer.global_position = path[0]
     var last_tick := Time.get_ticks_msec()
     for i in range(1, path.size()):

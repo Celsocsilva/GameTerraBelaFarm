@@ -56,6 +56,9 @@ var placements: Array[Dictionary] = []
 ## Áreas reservadas por outros sistemas (ex.: RiverSystem, ENV-002). Cada item
 ## expõe blocks_decoration(point: Vector3, radius: float) -> bool.
 var reserved_areas: Array[Object] = []
+## Retângulos XZ bloqueados (já com folga) informados pelo FarmWorld: cerca,
+## galpão e parcela extra (FV-FARM-008).
+var blocked_rects: Array[Rect2] = []
 var _farm_size := 0.0
 var _plot_half_width := 0.0
 var _plot_start_z := 0.0
@@ -129,18 +132,18 @@ func is_allowed_position(point: Vector3, radius: float = 0.0) -> bool:
     if absf(point.x) < _plot_half_width + 1.5 + radius and \
             point.z > _plot_start_z - 1.8 - radius and point.z < _plot_end_z + 1.8 + radius:
         return false
-    # Acesso do fazendeiro pela frente e circulação entre campo e balcão.
-    if absf(point.x) < 3.2 + radius and point.z > -8.0 - radius:
+    # Acesso do fazendeiro pela frente e circulação entre campo e balcão
+    # (começa 10,3 m ao norte do canteiro, como no layout original).
+    if absf(point.x) < 3.2 + radius and point.z > _plot_start_z - 10.3 - radius:
         return false
     if Vector2(point.x - _sales_position.x, point.z - _sales_position.z).length() < 7.0 + radius:
         return false
     if point.z > _sales_position.z - 6.0 - radius and absf(point.x) < 12.0 + radius:
         return false
-    # Construção, cerca e árvore já existentes na cena.
-    if absf(point.x - 5.0) < 3.0 + radius and absf(point.z + 3.0) < 2.8 + radius:
-        return false
-    if absf(point.x + 5.0) < 3.8 + radius and absf(point.z + 2.0) < 1.5 + radius:
-        return false
+    # Construção, cerca e parcela extra (posições vindas do FarmWorld) e a árvore.
+    for rect in blocked_rects:
+        if rect.grow(radius).has_point(Vector2(point.x, point.z)):
+            return false
     if Vector2(point.x + 10.0, point.z - 10.0).length() < 2.7 + radius:
         return false
     for area in reserved_areas:

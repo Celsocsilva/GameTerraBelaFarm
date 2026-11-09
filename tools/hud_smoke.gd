@@ -165,6 +165,37 @@ func _run() -> void:
     if hud.get_banner_message() != "Loja em breve!":
         return _fail("loja")
 
+    # 8b. Modal de recompensa (UI-REWARD-001): chaves de ui.csv nos 3 idiomas e
+    # textos (normais e longos) sempre dentro das áreas internas do cartão.
+    var reward := hud.reward_popup
+    var reward_texts := {
+        "pt_BR": ["Recompensa!", "Missão concluída!", "Coletar"],
+        "es": ["¡Recompensa!", "¡Misión completada!", "Recoger"],
+        "en": ["Reward!", "Quest complete!", "Collect"],
+    }
+    for locale in reward_texts:
+        TranslationServer.set_locale(locale)
+        reward.show_reward(RewardPopup.DEFAULT_TITLE, RewardPopup.DEFAULT_MESSAGE, 10)
+        var expected_texts: Array = reward_texts[locale]
+        if reward.title_label.text != expected_texts[0] or reward.message_label.text != expected_texts[1] or reward.collect_button.caption.text != expected_texts[2]:
+            return _fail("recompensa em %s: '%s' '%s' '%s'" % [locale, reward.title_label.text, reward.message_label.text, reward.collect_button.caption.text])
+        if not _reward_fits(reward, false):
+            return
+        reward.show_reward("Recompensa especial da colheita de hoje!", "Missão diária de colheita de tomates concluída com muito sucesso!", 9999999, RewardPopup.CASH_ICON, "Coletar recompensa agora")
+        if not _reward_fits(reward, true):
+            return
+        print("REWARD_LOCALE %s title=%d message=%d button=%d" % [locale, reward.title_label.get_theme_font_size("font_size"), reward.message_label.get_theme_font_size("font_size"), reward.collect_button.caption.get_theme_font_size("font_size")])
+        reward.collect()
+    # Troca de idioma com o modal aberto refaz os textos.
+    TranslationServer.set_locale("pt_BR")
+    reward.show_reward(RewardPopup.DEFAULT_TITLE, RewardPopup.DEFAULT_MESSAGE, 10)
+    TranslationServer.set_locale("en")
+    await process_frame
+    if reward.title_label.text != "Reward!" or reward.collect_button.caption.text != "Collect":
+        return _fail("modal não refez os textos ao trocar idioma: %s" % reward.title_label.text)
+    reward.collect()
+    TranslationServer.set_locale("pt_BR")
+
     # 9. QA de assets: só PNGs do pacote UI v5; dinheiro = maço oficial;
     # nenhuma imagem de referência; nenhum PNG cortado ou distorcido.
     hud.reward_popup.show_reward("Recompensa!", "Missão concluída!", 25)
@@ -356,3 +387,39 @@ func _check_textures(node: Node) -> int:
             _fail("%s distorcido" % node.get_path())
             return count
     return count + 1
+
+## Cada texto do modal cabe na sua área (sem invadir faixa, placa ou bordas):
+## normais sem reticências e no tamanho máximo ou perto; longos podem encolher.
+func _reward_fits(reward: RewardPopup, long_text: bool) -> bool:
+    for label in [reward.title_label, reward.message_label, reward.value_label, reward.collect_button.caption]:
+        var l := label as Label
+        var font_size := l.get_theme_font_size("font_size")
+        var outline := float(l.get_theme_constant("outline_size"))
+        var lines := maxi(1, l.get_line_count())
+        var visible_lines := mini(lines, l.max_lines_visible) if l.max_lines_visible > 0 else lines
+        var height := visible_lines * l.get_line_height() + (visible_lines - 1) * l.get_theme_constant("line_spacing")
+        # Linha única: largura do texto; com quebra, o Label limita a largura.
+        var widest := UiStyle.text_width(l) if l.autowrap_mode == TextServer.AUTOWRAP_OFF else 0.0
+        # Último recurso aceito: recorte com reticências (nada passa da área).
+        var trimmed := l.clip_text and l.text_overrun_behavior == TextServer.OVERRUN_TRIM_ELLIPSIS
+        if long_text and trimmed:
+            widest = 0.0
+        if height > l.size.y + 1.0 or widest > l.size.x - outline:
+            _fail("texto do modal sai da área: %s '%s' fonte %d altura %.0f/%.0f largura %.0f/%.0f" % [l.name, l.text, font_size, height, l.size.y, widest, l.size.x])
+            return false
+        if not long_text and font_size < 24:
+            _fail("texto normal do modal ficou pequeno demais: %s %d" % [l.name, font_size])
+            return false
+    var rects := {reward.title_label: RewardPopup.TITLE_RECT, reward.message_label: RewardPopup.MESSAGE_RECT, reward.value_label: RewardPopup.VALUE_RECT}
+    for label in rects:
+        if not Rect2((label as Label).position, (label as Label).size).is_equal_approx(rects[label]):
+            _fail("%s cresceu além da área: %s" % [(label as Label).name, Rect2((label as Label).position, (label as Label).size)])
+            return false
+    # Áreas internas não se sobrepõem.
+    var areas := [RewardPopup.TITLE_RECT, RewardPopup.MESSAGE_RECT, RewardPopup.VALUE_RECT, RewardPopup.BUTTON_RECT]
+    for i in areas.size():
+        for j in range(i + 1, areas.size()):
+            if (areas[i] as Rect2).intersects(areas[j]):
+                _fail("áreas do modal se sobrepõem: %s x %s" % [areas[i], areas[j]])
+                return false
+    return true

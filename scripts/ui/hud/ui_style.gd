@@ -48,6 +48,42 @@ static func fit_font(label: Label, max_size: int, min_size: int = 10) -> void:
         font_size -= 1
     label.add_theme_font_size_override("font_size", font_size)
 
+## Ajuste automático para caixas de texto traduzíveis (UI-REWARD-001): reduz a
+## fonte de `max_size` até `min_size` para o texto caber INTEIRO no retângulo do
+## Label (largura e altura, descontando o contorno), quebrando por palavra em até
+## `max_lines` linhas. Nenhuma palavra é cortada no meio. Se nem no mínimo
+## couber, o Label recorta e termina com reticências, sem invadir outras áreas.
+static func fit_font_box(label: Label, max_size: int, min_size: int = 12, max_lines: int = 1) -> int:
+    var outline := float(label.get_theme_constant("outline_size"))
+    var width := label.size.x - 4.0 - outline
+    var height := label.size.y - outline * 0.5
+    label.clip_text = true
+    label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+    label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART if max_lines > 1 else TextServer.AUTOWRAP_OFF
+    label.max_lines_visible = max_lines
+    if width <= 0.0 or height <= 0.0:
+        return max_size
+    var current_font := label.get_theme_font("font")
+    var font_size := max_size
+    var spacing := float(label.get_theme_constant("line_spacing"))
+    while font_size > min_size and not text_fits(current_font, label.text, font_size, width, height, max_lines, spacing):
+        font_size -= 1
+    label.add_theme_font_size_override("font_size", font_size)
+    return font_size
+
+## O texto cabe em `width` x `height` com no máximo `max_lines` linhas?
+static func text_fits(current_font: Font, text: String, font_size: int, width: float, height: float, max_lines: int, spacing: float = 3.0) -> bool:
+    var line_height := current_font.get_height(font_size)
+    if max_lines <= 1:
+        return current_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x <= width and line_height <= height
+    for word in text.split(" ", false):
+        if current_font.get_string_size(word, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x > width:
+            return false
+    var block := current_font.get_multiline_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, width, font_size)
+    var lines := maxi(1, int(round(block.y / line_height)))
+    # O Label soma o espaçamento entre linhas: n linhas = n*altura + (n-1)*espaço.
+    return lines <= max_lines and lines * line_height + (lines - 1) * spacing <= height
+
 ## Largura do texto no tamanho atual (para testes de truncamento).
 static func text_width(label: Label) -> float:
     var font_size := label.get_theme_font_size("font_size")

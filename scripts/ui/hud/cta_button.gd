@@ -34,6 +34,21 @@ const SAFE_PAD_RATIO := 10.0 / 191.0
             caption.text = value
             UiStyle.fit_font(caption, _caption_size())
 
+## Altura da fonte do texto em relação à altura do botão (o modal de recompensa
+## usa um valor menor para não encostar nas bordas).
+@export_range(0.2, 0.6, 0.01) var caption_ratio: float = 0.46:
+    set(value):
+        caption_ratio = value
+        if is_node_ready():
+            _apply_style()
+
+## Margem lateral extra do texto, em fração da altura do botão (0 = original).
+@export_range(0.0, 1.0, 0.01) var caption_inset: float = 0.0:
+    set(value):
+        caption_inset = value
+        if is_node_ready():
+            _layout()
+
 @onready var caption: Label = $Caption
 @onready var focus_ring: Panel = $FocusRing
 
@@ -72,7 +87,7 @@ func _apply_style() -> void:
     UiStyle.fit_font(caption, _caption_size())
 
 func _caption_size() -> int:
-    return maxi(12, int(size.y * 0.46))
+    return maxi(12, int(size.y * caption_ratio))
 
 func _layout() -> void:
     pivot_offset = size * 0.5
@@ -80,8 +95,9 @@ func _layout() -> void:
     focus_ring.position = Vector2(pad, pad) - Vector2(3, 3)
     focus_ring.size = size - Vector2(pad, pad) * 2.0 + Vector2(6, 6)
     _ring_style.set_corner_radius_all(int(focus_ring.size.y * 0.5))
-    caption.position = Vector2(pad * 2.0, 0.0)
-    caption.size = Vector2(size.x - pad * 4.0, size.y - pad * 2.0)
+    var inset := pad * 2.0 + size.y * caption_inset
+    caption.position = Vector2(inset, 0.0)
+    caption.size = Vector2(size.x - inset * 2.0, size.y - pad * 2.0)
     caption.position.y = pad * 0.5
     _apply_style()
 

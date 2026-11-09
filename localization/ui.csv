@@ -1,2 +1,16 @@
 keys,pt_BR,es,en
 STORE_LABEL,Loja,Tienda,Shop
+HELPER_TITLE,Ajudante,Ayudante,Helper
+HELPER_GRADE,Grau %d/%d,Grado %d/%d,Grade %d/%d
+HELPER_HIRE,Contratar,Contratar,Hire
+HELPER_UPGRADE,Melhorar,Mejorar,Upgrade
+HELPER_MAX,Máximo,Máximo,Max
+HELPER_HIRED,Ajudante contratado! Ele empilha os tomates na parcela.,¡Ayudante contratado! Apila los tomates en la parcela.,Helper hired! They stack tomatoes on the plot.
+HELPER_UPGRADED,Ajudante subiu para o grau %d!,¡El ayudante subió al grado %d!,Helper reached grade %d!
+HELPER_NO_MONEY,Faltam %d para o ajudante.,Faltan %d para el ayudante.,You need %d more for the helper.
+CROP_TOMATO,Tomate,Tomate,Tomato
+CROP_CORN,Milho,Maíz,Corn
+CROP_PUMPKIN,Abóbora,Calabaza,Pumpkin
+REWARD_TITLE,Recompensa!,¡Recompensa!,Reward!
+REWARD_MISSION_COMPLETE,Missão concluída!,¡Misión completada!,Quest complete!
+REWARD_COLLECT,Coletar,Recoger,Collect

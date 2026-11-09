@@ -7,17 +7,39 @@ class_name RewardPopup
 ## (assets/currency/cash_bundle_official.png).
 ##
 ## Abrir o popup não cria dinheiro: só `collect()` emite `collected`, uma vez.
+##
+## Textos (UI-REWARD-001): título, mensagem e botão aceitam chaves de
+## localization/ui.csv (REWARD_TITLE, REWARD_MISSION_COMPLETE, REWARD_COLLECT) ou
+## texto já pronto. Cada texto fica num retângulo interno com margem (dentro da
+## faixa vermelha, do creme e da placa) e a fonte é reduzida automaticamente
+## (UiStyle.fit_font_box) até caber, com quebra de linha por palavra na mensagem
+## e reticências como último recurso. Ao trocar o idioma, tudo é refeito.
 
 signal collected(amount: int)
 
 const CASH_ICON := preload("res://assets/currency/cash_bundle_official.png")
 const CARD_SIZE := Vector2(577, 546)
-const TITLE_RECT := Rect2(105, 213, 367, 72)
-const MESSAGE_RECT := Rect2(60, 300, 457, 52)
+## Retângulos internos (pixels do PNG 577 x 546) com margem de segurança:
+## o título fica só na parte reta da faixa vermelha, a mensagem no creme entre as
+## pontas da faixa (que descem até y ~320 nas laterais) e acima da placa, o valor
+## dentro da placa clara.
+const TITLE_RECT := Rect2(132, 224, 313, 54)
+const MESSAGE_RECT := Rect2(126, 300, 325, 56)
 const PLATE_RECT := Rect2(108, 348, 361, 90)
 const VALUE_ICON_RECT := Rect2(132, 358, 100, 70)
-const VALUE_RECT := Rect2(236, 348, 220, 90)
+const VALUE_RECT := Rect2(238, 364, 206, 62)
 const BUTTON_RECT := Rect2(138, 445, 300, 86)
+## Tamanhos de fonte (máximo / mínimo) — menores que na v5 original (54/38/56).
+const TITLE_FONT := Vector2i(42, 18)
+const MESSAGE_FONT := Vector2i(30, 14)
+const VALUE_FONT := Vector2i(44, 18)
+const BUTTON_CAPTION_RATIO := 0.36
+const BUTTON_CAPTION_INSET := 0.3
+const MESSAGE_MAX_LINES := 2
+## Chaves padrão (localization/ui.csv).
+const DEFAULT_TITLE := "REWARD_TITLE"
+const DEFAULT_MESSAGE := "REWARD_MISSION_COMPLETE"
+const DEFAULT_BUTTON := "REWARD_COLLECT"
 const IN_TIME := 0.32
 const OUT_TIME := 0.2
 
@@ -31,28 +53,59 @@ const OUT_TIME := 0.2
 @onready var collect_button: CtaButton = $Card/CollectButton
 
 var amount := 0
+var _title_key := DEFAULT_TITLE
+var _message_key := DEFAULT_MESSAGE
+var _button_key := DEFAULT_BUTTON
 var is_open := false
 var _card_scale := 1.0
 var _tween: Tween
 
 func _ready() -> void:
-    UiStyle.style_label(title_label, 54, Color.WHITE, UiStyle.OUTLINE_RED, 12)
+    UiStyle.style_label(title_label, TITLE_FONT.x, Color.WHITE, UiStyle.OUTLINE_RED, 10)
     UiStyle.place(title_label, TITLE_RECT)
-    UiStyle.style_label(message_label, 38)
+    UiStyle.style_label(message_label, MESSAGE_FONT.x)
     UiStyle.place(message_label, MESSAGE_RECT)
     UiStyle.place(value_plate, PLATE_RECT)
     UiStyle.place(value_icon, VALUE_ICON_RECT)
-    UiStyle.style_label(value_label, 56)
+    UiStyle.style_label(value_label, VALUE_FONT.x)
     UiStyle.place(value_label, VALUE_RECT)
     UiStyle.place(collect_button, BUTTON_RECT)
+    # O texto exibido já vem traduzido por tr(); assim o ajuste mede o texto real.
+    for label in [title_label, message_label, value_label]:
+        (label as Label).auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+    collect_button.caption.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
     collect_button.color = "green"
-    collect_button.text = "Coletar"
+    collect_button.caption_ratio = BUTTON_CAPTION_RATIO
+    collect_button.caption_inset = BUTTON_CAPTION_INSET
     collect_button.pressed.connect(collect)
     card.size = CARD_SIZE
     card.pivot_offset = CARD_SIZE * 0.5
     resized.connect(_layout)
     visible = false
+    _apply_texts()
     _layout()
+
+func _notification(what: int) -> void:
+    if what == NOTIFICATION_TRANSLATION_CHANGED and is_node_ready():
+        _apply_texts()
+
+## Traduz (chave ou texto pronto) e ajusta cada texto à sua área.
+func _apply_texts() -> void:
+    _place_texts()
+    title_label.text = tr(_title_key)
+    UiStyle.fit_font_box(title_label, TITLE_FONT.x, TITLE_FONT.y, 1)
+    message_label.text = tr(_message_key)
+    UiStyle.fit_font_box(message_label, MESSAGE_FONT.x, MESSAGE_FONT.y, MESSAGE_MAX_LINES)
+    value_label.text = UiStyle.format_int(amount)
+    UiStyle.fit_font_box(value_label, VALUE_FONT.x, VALUE_FONT.y, 1)
+    collect_button.text = tr(_button_key)
+    # Uma fonte anterior maior pode ter esticado o Label; volta às áreas internas.
+    _place_texts()
+
+func _place_texts() -> void:
+    UiStyle.place(title_label, TITLE_RECT)
+    UiStyle.place(message_label, MESSAGE_RECT)
+    UiStyle.place(value_label, VALUE_RECT)
 
 ## Centraliza o cartão e o reduz para caber na tela (retrato ou paisagem).
 func _layout() -> void:
@@ -65,16 +118,15 @@ func _layout() -> void:
 func get_card_scale() -> float:
     return _card_scale
 
-func show_reward(title: String, message: String, value: int, icon: Texture2D = CASH_ICON, button_text: String = "Coletar") -> void:
+## `title`, `message` e `button_text` podem ser chaves de localization/ui.csv
+## (padrão) ou textos prontos.
+func show_reward(title: String = DEFAULT_TITLE, message: String = DEFAULT_MESSAGE, value: int = 0, icon: Texture2D = CASH_ICON, button_text: String = DEFAULT_BUTTON) -> void:
     amount = value
-    title_label.text = title
-    UiStyle.fit_font(title_label, 54)
-    message_label.text = message
-    UiStyle.fit_font(message_label, 38)
+    _title_key = title
+    _message_key = message
+    _button_key = button_text
     value_icon.texture = icon
-    value_label.text = UiStyle.format_int(value)
-    UiStyle.fit_font(value_label, 56)
-    collect_button.text = button_text
+    _apply_texts()
     collect_button.set_enabled(true)
     is_open = true
     visible = true
@@ -88,7 +140,7 @@ func show_reward(title: String, message: String, value: int, icon: Texture2D = C
     _tween.tween_property(card, "modulate:a", 1.0, IN_TIME * 0.6)
     _tween.tween_property(dim, "modulate:a", 1.0, IN_TIME)
 
-## Botão "Coletar": animação de saída e depois emite `collected` (uma única vez).
+## Botão "Coletar" (REWARD_COLLECT): animação de saída e depois emite `collected` (uma única vez).
 func collect() -> void:
     if not is_open:
         return

@@ -51,7 +51,7 @@ func _ready() -> void:
     reward.offset_left = 330.0
     reward.offset_right = -420.0
     reward.dim.color = Color(0, 0, 0, 0)
-    reward.show_reward("Recompensa!", "Missão concluída!", 75)
+    reward.show_reward(RewardPopup.DEFAULT_TITLE, RewardPopup.DEFAULT_MESSAGE, 75)
 
 func _add(scene_name: String, at: Vector2, factor: float) -> Control:
     var node := (load(COMPONENTS + scene_name + ".tscn") as PackedScene).instantiate() as Control

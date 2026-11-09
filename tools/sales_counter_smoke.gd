@@ -55,18 +55,20 @@ func _run() -> void:
         return _fail("produção inteira: %d unidades, %d caixas" % [counter.get_stored_total(), counter.get_displayed_crates()])
     print("DEPOSIT stored=%d crates=%d" % [counter.get_stored_total(), counter.get_displayed_crates()])
 
-    # 2b. Caixas do balcão = arte das caixas da mochila; 2 fileiras (uma na frente da outra).
+    # 2b. Caixas do balcão = arte das caixas da mochila; uma única pilha (FV-STACK-001).
     if counter.get_crate_texture(0) != BackpackCrates.CRATE_FULL_TEXTURE:
         return _fail("balcão sem a arte das caixas da mochila")
-    var back := counter.get_crate_slot_position(0)
-    var front := counter.get_crate_slot_position(SalesCounter.COLUMNS)
-    if SalesCounter.ROWS_PER_LAYER < 2 or not is_equal_approx(back.x, front.x) or front.z - back.z < 0.9 \
-            or absf(back.z - counter.global_position.z) + SalesCounter.CRATE_SPACING.z * 0.5 > half.y + 0.1:
-        return _fail("2 caixas uma na frente da outra não cabem: trás %s frente %s" % [back, front])
+    counter.finish_jumps()
+    var bottom := counter.get_crate_slot_position(0)
+    var stack_top := counter.get_crate_slot_position(SalesCounter.MAX_VISUAL_CRATES - 1)
+    if not is_equal_approx(bottom.x, stack_top.x) or stack_top.y <= bottom.y or absf(bottom.z - counter.global_position.z) > half.y:
+        return _fail("pilha única fora do balcão: base %s topo %s" % [bottom, stack_top])
+    if counter.get_visible_crate_count() != SalesCounter.MAX_VISUAL_CRATES or counter.get_count_text() != "x28":
+        return _fail("28 caixas: %d visíveis, contador '%s'" % [counter.get_visible_crate_count(), counter.get_count_text()])
     counter.set_stored_total(13)
     if counter.get_crate_texture(1) != BackpackCrates.CRATE_EMPTY_TEXTURE or counter.get_crate_texture(0) != BackpackCrates.CRATE_FULL_TEXTURE:
         return _fail("caixa incompleta sem a arte parcial")
-    print("COUNTER_CRATES art=crate_full rows=%d back_z=%.2f front_z=%.2f depth=%.2f" % [SalesCounter.ROWS_PER_LAYER, back.z, front.z, half.y * 2.0])
+    print("COUNTER_CRATES art=crate_full stack=1 visual_max=%d base_y=%.2f top_y=%.2f" % [SalesCounter.MAX_VISUAL_CRATES, bottom.y, stack_top.y])
 
     # 2c. Descarga animada: as caixas pulam das mãos do fazendeiro até a pilha.
     counter.set_stored_total(0)
