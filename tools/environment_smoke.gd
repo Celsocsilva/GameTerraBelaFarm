@@ -176,6 +176,7 @@ func _check_seed(world: FarmWorld) -> void:
     duplicate.prop_density = original.prop_density
     duplicate.grass_tiles_per_meter = original.grass_tiles_per_meter
     duplicate.reserved_areas = original.reserved_areas.duplicate()
+    duplicate.blocked_rects = original.blocked_rects.duplicate()
     var mesh := MeshInstance3D.new()
     duplicate.setup(mesh, world.farm_size, world.get_planting_area_half_width(),
         FarmWorld.PLANTING_NEAR_EDGE_Z,

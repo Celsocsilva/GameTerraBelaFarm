@@ -83,9 +83,16 @@ func _run() -> void:
     _audit_quad(camera, "Maço na base de dinheiro", MoneyStack.MONEY_TEXTURE, bundle.global_transform, (bundle.mesh as QuadMesh).size)
     var counter_sprite := world.sales_counter.get_node("CounterCrate_00/CrateSprite") as Sprite3D
     _audit_sprite(camera, "Caixa no Balcão de vendas", counter_sprite)
+    # FV-PROPS-001: banca de feira (quadro inclinado) na proporção do PNG.
+    var stall := world.sales_counter.get_node("CounterBody/StallVisual") as MeshInstance3D
+    _audit_quad(camera, "Banca de feira (toalha xadrez)", SalesCounter.STALL_TEXTURE, stall.global_transform, (stall.mesh as QuadMesh).size)
     var backpack_sprite := world.backpack.get_node("BackpackStackRoot/Crate_0/CrateSprite") as Sprite3D
     _audit_sprite(camera, "Caixa na mochila", backpack_sprite)
     _audit_billboard(camera, "Planta de tomate", crop.sprite)
+    # Placa do terreno de tomate (quadro de pé com altura compensada).
+    var sign := world.get_crop_sign(&"tomato")
+    var board := sign.get_board()
+    _audit_quad(camera, "Placa do terreno (tomate)", sign.get_texture(), board.global_transform, (board.mesh as QuadMesh).size)
 
     # Objetos 3D: alinhados ao eixo da câmera e em pé.
     _audit_upright("Fazendeiro (corpo em pé)", world.farmer, false)

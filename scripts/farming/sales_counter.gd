@@ -9,18 +9,25 @@ class_name SalesCounter
 ## ligam as pontas do balcão às laterais do terreno: o fazendeiro fica sempre
 ## do lado da plantação (-Z) e não passa para o lado dos clientes (+Z).
 ##
-## As caixas usam a mesma arte das caixas da mochila (crate_full/crate_empty),
-## em 2 fileiras (uma na frente da outra) por coluna. Ao descarregar, cada caixa
-## pula das mãos do fazendeiro até o seu lugar na pilha.
+## Visual (FV-PROPS-001): banca de feira com toalha xadrez vermelha no lugar do
+## tampo marrom; a pegada, a colisão, as cercas laterais e a pilha de caixas não
+## mudam. FV-PROPS-002 trocou a arte por uma versão mais funda; FV-STACK-001
+## voltou para a banca plana (assets/sales/stall_market_gingham.png). A arte
+## funda continua guardada em assets/sales, sem uso.
+##
+## As caixas usam a mesma arte das caixas da mochila (crate_full/crate_empty).
+## FV-STACK-001: UMA única pilha vertical por cultura (CrateStack), com no
+## máximo MAX_VISUAL_CRATES caixas visíveis; acima disso a contagem lógica segue
+## correta e um contador "x12" aparece acima da pilha. Ao descarregar, cada
+## caixa pula das mãos do fazendeiro até o seu lugar na pilha.
 
 signal deposited(units: int, stored_total: int)
 signal stock_taken(units: int, stored_total: int)
 
-## Largura dobrada em relação ao antigo depósito (3 -> 6 colunas de caixas).
-const COLUMNS := 6
-const ROWS_PER_LAYER := 2
-const LAYERS := 4
-const MAX_VISUAL_CRATES := COLUMNS * ROWS_PER_LAYER * LAYERS
+## Altura visual máxima da pilha (caixas); o resto vira o contador "xN".
+const MAX_VISUAL_CRATES := 4
+## Distância X (centro a centro) entre as pilhas de culturas diferentes.
+const STACK_SPACING := 3.6
 ## Mesma arte das caixas da mochila do fazendeiro (BackpackCrates).
 const CRATE_FULL_TEXTURE := preload("res://assets/harvest/crate_full.png")
 const CRATE_EMPTY_TEXTURE := preload("res://assets/harvest/crate_empty.png")
@@ -38,9 +45,15 @@ const JUMP_STAGGER := 0.09
 const JUMP_HEIGHT := 1.6 * COUNTER_SCALE
 ## Tampo do balcão: 8,5 m de largura e fundo para 2 caixas, uma na frente da outra.
 const COUNTER_SIZE := Vector3(8.5 * COUNTER_SCALE, 0.16, 2.25 * COUNTER_SCALE)
-## Rebordo baixo do lado dos clientes, para não esconder as caixas.
-const BACK_HEIGHT := 0.35 * COUNTER_SCALE
 const BARRIER_HEIGHT := 0.7
+## Arte da banca de feira plana (toalha xadrez vermelha) — FV-STACK-001.
+const STALL_TEXTURE := preload("res://assets/sales/stall_market_gingham.png")
+## Largura da arte na cena: a mesma do balcão (a colisão não muda).
+const STALL_WIDTH := 8.5 * COUNTER_SCALE
+## Meio da área da toalha vista de cima no PNG (fração da altura, do topo).
+const STALL_CLOTH_CENTER := 0.27
+## Inclinação da câmera do jogo (FarmWorld: camera_height == camera_distance).
+const VIEW_PITCH_DEGREES := 45.0
 
 @export_range(0, 48, 1) var initial_displayed_crates: int = 0
 ## Recuado da cerca para caber a fila dupla de 7 clientes do lado +Z.
@@ -61,17 +74,16 @@ var _inventory: HarvestInventory
 var _farm_size := 0.0
 var _body: StaticBody3D
 var _camera: Camera3D
-## Caixas ainda no ar (índice -> true): só aparecem na pilha ao pousar.
+## Caixas ainda no ar (vaga visual -> quantas a caminho): só aparecem ao pousar.
 var _in_flight: Dictionary = {}
+var _count_label: Label3D
 var _flyers: Array[Node3D] = []
 
 func _ready() -> void:
-    var pallet := _material(Color(0.28, 0.17, 0.09))
     _body = StaticBody3D.new()
     _body.name = "CounterBody"
     add_child(_body)
-    _add_box(_body, "CounterTop", COUNTER_SIZE, Vector3(0.0, COUNTER_SIZE.y * 0.5, 0.0), pallet)
-    _add_box(_body, "CounterBack", Vector3(COUNTER_SIZE.x, BACK_HEIGHT, 0.16), Vector3(0.0, BACK_HEIGHT * 0.5, COUNTER_SIZE.z * 0.5 + 0.055), pallet)
+    _build_stall_visual()
     var collision := CollisionShape3D.new()
     collision.name = "CounterCollision"
     var shape := BoxShape3D.new()
@@ -81,7 +93,53 @@ func _ready() -> void:
     _body.add_child(collision)
     for index in MAX_VISUAL_CRATES:
         _crate_visuals.append(_build_crate(index))
+    _count_label = CrateStack.make_count_label()
+    _count_label.position = _count_label_local()
+    add_child(_count_label)
     set_displayed_crates(initial_displayed_crates)
+
+## Banca de feira com toalha xadrez (FV-PROPS-001): a arte inteira num único
+## quadro inclinado que vai do chão na frente do balcão (+Z, lado dos clientes)
+## até o alto da borda de trás (-Z, lado do fazendeiro). Com a câmera fixa a
+## 45°, o quadro aparece na proporção exata do PNG e cobre a mesma pegada da
+## colisão. As caixas ficam acima do quadro (sempre na frente dele na tela) e
+## pousam sobre a toalha desenhada.
+func _build_stall_visual() -> void:
+    var stall := MeshInstance3D.new()
+    stall.name = "StallVisual"
+    var quad := QuadMesh.new()
+    var depth := COUNTER_SIZE.z
+    var rise := get_stall_rise()
+    quad.size = Vector2(STALL_WIDTH, Vector2(depth, rise).length())
+    stall.mesh = quad
+    stall.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    var material := StandardMaterial3D.new()
+    material.albedo_texture = STALL_TEXTURE
+    material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+    material.alpha_scissor_threshold = 0.5
+    material.cull_mode = BaseMaterial3D.CULL_DISABLED
+    material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+    stall.material_override = material
+    # Topo do quadro inclinado para trás (-Z): de (y 0, z +d/2) a (y rise, z -d/2).
+    stall.rotation.x = -atan2(depth, rise)
+    stall.position = Vector3(0.0, rise * 0.5, 0.0)
+    _body.add_child(stall)
+
+## Altura (m) da borda de trás do quadro da banca, para que a arte apareça na
+## tela com a mesma proporção do PNG: altura na tela = rise*cos(p) + fundo*sen(p).
+static func get_stall_rise() -> float:
+    var pitch := deg_to_rad(VIEW_PITCH_DEGREES)
+    var screen_height := STALL_WIDTH * float(STALL_TEXTURE.get_height()) / float(STALL_TEXTURE.get_width())
+    return (screen_height - COUNTER_SIZE.z * sin(pitch)) / cos(pitch)
+
+## Altura da base das caixas: o meio das 2 fileiras cai no meio da toalha
+## desenhada (STALL_CLOTH_CENTER, fração da altura do PNG a partir do topo).
+static func get_crate_base_height() -> float:
+    var pitch := deg_to_rad(VIEW_PITCH_DEGREES)
+    var screen_height := STALL_WIDTH * float(STALL_TEXTURE.get_height()) / float(STALL_TEXTURE.get_width())
+    var top_on_screen := get_stall_rise() * cos(pitch) + COUNTER_SIZE.z * 0.5 * sin(pitch)
+    return (top_on_screen - STALL_CLOTH_CENTER * screen_height) / cos(pitch)
 
 func _process(_delta: float) -> void:
     _orient_sprites()
@@ -161,10 +219,12 @@ func set_stored_total(total: int) -> void:
     _sync_display()
 
 func _sync_display() -> void:
-    set_displayed_crates(mini(MAX_VISUAL_CRATES, get_stock_crates()))
+    set_displayed_crates(get_stock_crates())
 
+## Contagem lógica de caixas na pilha (sem limite); a pilha mostra no máximo
+## MAX_VISUAL_CRATES e o contador cobre o resto.
 func set_displayed_crates(count: int) -> void:
-    _displayed_crates = clampi(count, 0, MAX_VISUAL_CRATES)
+    _displayed_crates = maxi(count, 0)
     _refresh_visible()
 
 ## Caixas do estoque na pilha (contagem lógica, inclui as que ainda estão pulando).
@@ -182,7 +242,15 @@ func get_visible_crate_count() -> int:
 func get_flying_crate_count() -> int:
     return _flyers.size()
 
-## Posição (mundo) da base da caixa de um índice da pilha.
+## Texto do contador acima da pilha ("" enquanto todas as caixas aparecem).
+func get_count_text() -> String:
+    return _count_label.text if _count_label and _count_label.visible else ""
+
+func get_count_label() -> Label3D:
+    return _count_label
+
+## Posição (mundo) da base da caixa de um índice da pilha (índices além do
+## limite visual pousam no topo).
 func get_crate_slot_position(index: int) -> Vector3:
     return to_global(_slot_local(index))
 
@@ -191,18 +259,25 @@ func get_crate_texture(index: int) -> Texture2D:
 
 func _refresh_visible() -> void:
     var partial := _stored_total % units_per_crate != 0 and _displayed_crates == get_stock_crates()
+    var shown := mini(_displayed_crates, MAX_VISUAL_CRATES)
     for index in _crate_visuals.size():
         var crate := _crate_visuals[index]
-        crate.visible = index < _displayed_crates and not _in_flight.has(index)
+        crate.visible = index < shown and not _in_flight.has(index)
         var sprite := crate.get_node("CrateSprite") as Sprite3D
-        # A última caixa incompleta usa a arte de caixa parcial, como na mochila.
-        var texture: Texture2D = CRATE_EMPTY_TEXTURE if partial and index == _displayed_crates - 1 else CRATE_FULL_TEXTURE
+        # A caixa do topo, se incompleta, usa a arte de caixa parcial, como na mochila.
+        var texture: Texture2D = CRATE_EMPTY_TEXTURE if partial and index == shown - 1 else CRATE_FULL_TEXTURE
         if sprite.texture != texture:
             _apply_texture(sprite, texture)
+    if _count_label:
+        var text := CrateStack.count_text(_displayed_crates, MAX_VISUAL_CRATES)
+        _count_label.text = text
+        _count_label.visible = text != ""
+        _count_label.position = _count_label_local()
 
 ## Uma caixa sai das mãos, sobe em arco e pousa no seu lugar com um "pulo".
 func _launch_crate(index: int, from: Vector3, delay: float) -> void:
-    _in_flight[index] = true
+    var slot := CrateStack.visual_index(index, MAX_VISUAL_CRATES)
+    _in_flight[slot] = int(_in_flight.get(slot, 0)) + 1
     _refresh_visible()
     var target := get_crate_slot_position(index)
     var flyer := Node3D.new()
@@ -223,7 +298,7 @@ func _launch_crate(index: int, from: Vector3, delay: float) -> void:
     tween.tween_interval(delay)
     tween.tween_callback(flyer.show)
     tween.tween_method(_move_flyer.bind(flyer, from, target), 0.0, 1.0, JUMP_TIME)
-    tween.tween_callback(_land_crate.bind(index, flyer))
+    tween.tween_callback(_land_crate.bind(slot, flyer))
 
 func _move_flyer(t: float, flyer: Node3D, from: Vector3, to: Vector3) -> void:
     if not is_instance_valid(flyer):
@@ -238,7 +313,11 @@ func _land_crate(index: int, flyer: Node3D) -> void:
     _flyers.erase(flyer)
     if is_instance_valid(flyer):
         flyer.queue_free()
-    _in_flight.erase(index)
+    var left := int(_in_flight.get(index, 1)) - 1
+    if left > 0:
+        _in_flight[index] = left
+    else:
+        _in_flight.erase(index)
     _refresh_visible()
     if index < _crate_visuals.size() and _crate_visuals[index].visible:
         var crate := _crate_visuals[index]
@@ -315,19 +394,23 @@ func _build_barriers() -> void:
         collision.position.y = 0.8
         barrier.add_child(collision)
 
-## Ordem da pilha: coluna a coluna na fileira de trás (-Z, lado do fazendeiro),
-## depois na fileira da frente (+Z), depois a camada de cima.
+## Pilha única da cultura (item_id): uma caixa em cima da outra, no meio da
+## toalha. Índices além do limite visual ficam no topo.
 func _slot_local(index: int) -> Vector3:
-    var layer := index / (COLUMNS * ROWS_PER_LAYER)
-    var row := (index / COLUMNS) % ROWS_PER_LAYER
-    var column := index % COLUMNS
+    var layer := CrateStack.visual_index(index, MAX_VISUAL_CRATES)
     # Camadas de cima um pouco à frente (+Z): cobrem a borda da caixa de baixo
     # sem disputar profundidade no mesmo plano.
     return Vector3(
-        (column - (COLUMNS - 1) * 0.5) * CRATE_SPACING.x,
-        COUNTER_SIZE.y + layer * CRATE_SPACING.y,
-        (row - (ROWS_PER_LAYER - 1) * 0.5) * CRATE_SPACING.z + layer * 0.03
+        CrateStack.slot_x(item_id, STACK_SPACING),
+        get_crate_base_height() + layer * CRATE_SPACING.y,
+        layer * 0.03
     )
+
+## Contador logo acima da caixa do topo.
+func _count_label_local() -> Vector3:
+    var crate_height := CRATE_WIDTH * float(CRATE_FULL_TEXTURE.get_height()) / float(CRATE_FULL_TEXTURE.get_width())
+    var stretch := 1.0 / cos(deg_to_rad(VIEW_PITCH_DEGREES))
+    return _slot_local(MAX_VISUAL_CRATES - 1) + Vector3(0.0, crate_height * stretch + 0.45, 0.2)
 
 func _build_crate(index: int) -> Node3D:
     var crate := Node3D.new()

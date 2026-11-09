@@ -20,6 +20,7 @@ func _run() -> void:
     root.add_child(world)
     await process_frame
     _check_soil(world)
+    _check_layout(world)
     _check_grid(world)
     _check_throw_reach(world)
     await _check_crop_sizes(world)
@@ -61,6 +62,44 @@ func _check_soil(world: FarmWorld) -> void:
     var art_aspect := float(SOIL_TEXTURE_SIZE.y) / float(SOIL_TEXTURE_SIZE.x)
     _check(absf(on_screen_aspect - art_aspect) < 0.02, "Tira não pode parecer comprimida na tela")
     print("SOIL_OK texture=", soil.get_size(), " quad=", quad.size)
+
+## FV-FARM-008: canteiro a 3x a distância até o balcão; parcela extra com 10%
+## da área, quadrada na tela, fora do rio, do balcão, do dinheiro e das pontes.
+func _check_layout(world: FarmWorld) -> void:
+    var field := world.get_planting_area_rect()
+    var counter_front := world.sales_counter.position.z - world.sales_counter.get_half_extents().y
+    var gap := counter_front - field.end.y
+    _check(absf(gap - FarmWorld.PREVIOUS_COUNTER_GAP * 3.0) < 0.02, "Distância canteiro->balcão deve ser 3x %.3f (obtido %.3f)" % [FarmWorld.PREVIOUS_COUNTER_GAP, gap])
+    var extra := world.get_extra_plot_rect()
+    var ratio := extra.get_area() / field.get_area()
+    _check(absf(ratio - 0.10) < 0.001, "Parcela extra deve ter 10%% da área (obtido %.4f)" % ratio)
+    # Quadrada na tela: a câmera a 45° encurta o eixo Z por sin(45°).
+    var screen_aspect := extra.size.y * sin(deg_to_rad(FarmWorld.PLANTING_VIEW_PITCH_DEGREES)) / extra.size.x
+    _check(absf(screen_aspect - 1.0) < 0.04, "Parcela extra deve parecer quadrada na tela (altura/largura %.3f)" % screen_aspect)
+    _check(not extra.intersects(field), "Parcela extra sobre o canteiro de tomate")
+    var counter_half := world.sales_counter.get_half_extents()
+    var counter_rect := Rect2(world.sales_counter.position.x - counter_half.x, world.sales_counter.position.z - counter_half.y, counter_half.x * 2.0, counter_half.y * 2.0)
+    var money_half := Vector2(MoneyStack.get_base_size().x, MoneyStack.get_base_size().z) * 0.5
+    var money_rect := Rect2(Vector2(world.money_stack.position.x, world.money_stack.position.z) - money_half, money_half * 2.0)
+    for rect in [field, extra]:
+        _check(not rect.grow(1.0).intersects(counter_rect), "Área de cultivo encosta no balcão")
+        _check(not rect.grow(1.0).intersects(money_rect), "Área de cultivo encosta no dinheiro")
+        for corner in [rect.position, rect.end, Vector2(rect.position.x, rect.end.y), Vector2(rect.end.x, rect.position.y), rect.get_center()]:
+            var point := Vector3(corner.x, 0.0, corner.y)
+            _check(not world.river_system.is_point_in_water(point, 2.0), "Área de cultivo no rio: " + str(point))
+        for bridge in world.river_system.get_bridges():
+            var b := Vector2(bridge.global_position.x, bridge.global_position.z)
+            # Saída leste da ponte (~3 m) precisa continuar livre.
+            _check(not rect.grow(1.0).has_point(b + Vector2(3.0, 0.0)), "Área de cultivo bloqueia a ponte " + bridge.name)
+    var spawn := Vector2(world.farmer.global_position.x, world.farmer.global_position.z)
+    _check(not field.has_point(spawn) and not extra.has_point(spawn), "Fazendeiro nasce dentro de uma área de cultivo")
+    for name in ["Fence", "Building"]:
+        var node := world.get_node(name) as Node3D
+        _check(not field.grow(1.0).has_point(Vector2(node.position.x, node.position.z)), name + " dentro do canteiro")
+    _check(world.extra_planting_area.get_child_count() == FarmWorld.EXTRA_PLOT_STRIPS, "Parcela extra deve ter %d tiras de solo" % FarmWorld.EXTRA_PLOT_STRIPS)
+    for soil in world.extra_planting_area.get_children():
+        _check(((soil as MeshInstance3D).material_override as StandardMaterial3D).albedo_texture == FarmWorld.SOIL_TEXTURE, "Parcela extra sem a textura do solo")
+    print("LAYOUT_OK gap=%.3f (antes %.3f) field=%s extra=%s ratio=%.4f screen_aspect=%.3f" % [gap, FarmWorld.PREVIOUS_COUNTER_GAP, field, extra, ratio, screen_aspect])
 
 func _check_grid(world: FarmWorld) -> void:
     var grid := world.planting_grid

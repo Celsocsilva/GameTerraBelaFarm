@@ -201,7 +201,7 @@ func _on_mission_progress(progress: int, target: int) -> void:
     mission_panel.set_progress(progress, target)
 
 func _on_mission_completed(mission: Dictionary) -> void:
-    reward_popup.show_reward("Recompensa!", "Missão concluída!", int(mission["reward"]))
+    reward_popup.show_reward(RewardPopup.DEFAULT_TITLE, RewardPopup.DEFAULT_MESSAGE, int(mission["reward"]))
 
 func _on_reward_collected(_amount: int) -> void:
     if missions:

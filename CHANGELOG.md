@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+- FV-STACK-001: banca de vendas de volta à arte plana (`assets/sales/stall_market_gingham.png`; a versão funda fica guardada sem uso), caixas sobre a toalha; no balcão e na parcela de 10% as caixas formam UMA única pilha por cultura (`CrateStack`: tomate no meio, milho à esquerda, abóbora à direita), altura visual limitada (4 no balcão, 5 na parcela) e contador "xN" acima da pilha quando passa do limite. Contagem lógica, colisão, fila, dinheiro e distância do terreno inalterados. Teste `tools/crate_stack_smoke.gd`, evidências em `docs/evidence/fv-stack-001/`.
+
+- FV-HELPER-001: ajudante contratado por uma plataforma no chão (paga dinheiro a dinheiro, 100 para contratar e 5 graus), colhe, empilha caixas na parcela de 10% e replanta; o fazendeiro recolhe a pilha pisando na parcela. Teste `tools/helper_smoke.gd`, evidências em `docs/evidence/fv-helper-001/`.
+
+- FV-FARM-008: terreno de tomate afastado do balcão (3x a faixa de grama), cerca e construção recuadas e parcela extra de 10% da área do terreno. Teste em `tools/farm_smoke.gd`, evidências em `docs/evidence/fv-farm-008/`.
+
+- UI-REWARD-001: modal de recompensa com fontes menores, áreas internas com margem e ajuste automático (quebra por palavra, tamanho mínimo, reticências só como último recurso); textos por chave em `localization/ui.csv` com EN/ES (Reward!/¡Recompensa!, Quest complete!/¡Misión completada!, Collect/Recoger). Teste em `tools/hud_smoke.gd`, capturas `tools/reward_popup_capture.gd`, evidências em `docs/evidence/ui-reward-001/`.
+
+- FV-PROPS-002: banca de vendas com a arte de toalha xadrez mais funda (`assets/sales/stall_market_gingham_deep.png`), mesma largura, colisão, fila, caixas e distância do terreno. Evidências em `docs/evidence/fv-props-002/`.
+
+- FV-PROPS-001: balcão de vendas com a arte da banca de feira de toalha xadrez (mesma pegada, colisão, caixas, fila e dinheiro) e placa de madeira com o nome da cultura (Label3D traduzido PT/ES/EN) em cada terreno de plantio; artes de tomate, milho e abóbora prontas. Teste `tools/stall_signs_smoke.gd`, captura `tools/stall_signs_capture.gd`, evidências em `docs/evidence/fv-props-001/`.
+
 - ENV-002: rio modular no lado oeste do mapa com 14 PNGs do pacote Rio e Pontes v1, água animada por shader leve, peças de junção sem frestas, faixas de margem com flores, ponte de madeira (`BridgeWood.tscn`, com acessos) e ponte de pedra (`BridgeStone.tscn`) atravessáveis por superfície em arco e corrimãos invisíveis. A água bloqueia a passagem fora das pontes; decoração e plantio respeitam o rio. Adicionados `river_tile_bake.gd`, `river_smoke.gd`, `river_capture.gd`, documentação e evidências em `docs/evidence/river_bridges/`.
 
 - ENV-001: integrados 45 PNGs de ambientação; grama repetível com variações locais e decoração determinística fora dos canteiros, rotas e zona de venda. Adicionados catálogo, guia, validação e capturas comparativas.
