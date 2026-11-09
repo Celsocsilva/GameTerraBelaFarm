@@ -96,6 +96,10 @@ func _ready() -> void:
     _carry_visual.add_child(_carry_sprite)
     _carry_visual.visible = false
 
+## CROP-CORN-001: produto deste ajudante (o da pilha dele: tomate ou milho).
+func get_item_id() -> StringName:
+    return pile.item_id if pile else &"tomato"
+
 func get_capacity() -> int:
     return HelperConfig.carry_crates(hiring.grade) * units_per_crate if hiring else units_per_crate
 
@@ -224,6 +228,9 @@ func _begin_harvest() -> void:
             var fx := PICKUP_FX_SCRIPT.new() as TomatoPickupFX
             fx.name = "HelperPickupFX_" + target_cell
             fx.use_trail = false
+            if get_item_id() != &"tomato":
+                fx.fruit_texture = CropCatalog.fruit_texture(get_item_id())
+                fx.fruit_height = CropCatalog.fruit_height(get_item_id())
             (world if world else get_parent()).add_child(fx)
             fx.launch(crop.get_harvest_origins(3, _get_camera()), _carry_visual)
 
@@ -313,7 +320,7 @@ func _update_carry_visual() -> void:
     if _carry_visual == null:
         return
     _carry_visual.visible = carried > 0
-    var texture: Texture2D = CRATE_FULL_TEXTURE if carried >= units_per_crate else CRATE_EMPTY_TEXTURE
+    var texture: Texture2D = ItemArt.full_texture(get_item_id()) if carried >= units_per_crate else CRATE_EMPTY_TEXTURE
     if _carry_sprite.texture != texture:
         _carry_sprite.texture = texture
         _carry_sprite.pixel_size = 0.9 / float(texture.get_width())

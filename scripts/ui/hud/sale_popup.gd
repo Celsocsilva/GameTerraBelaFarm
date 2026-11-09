@@ -17,31 +17,31 @@ const MONEY_GREEN := Color(0.2, 0.48, 0.05)
 @onready var detail_label: Label = $DetailLabel
 
 func _ready() -> void:
-    icon_rect.texture = CASH_ICON
-    UiStyle.place(icon_rect, ICON_RECT)
-    UiStyle.style_label(amount_label, 58, MONEY_GREEN)
-    UiStyle.place(amount_label, AMOUNT_RECT)
-    UiStyle.style_label(detail_label, 34)
-    UiStyle.place(detail_label, DETAIL_RECT)
+	icon_rect.texture = CASH_ICON
+	UiStyle.place(icon_rect, ICON_RECT)
+	UiStyle.style_label(amount_label, 58, MONEY_GREEN)
+	UiStyle.place(amount_label, AMOUNT_RECT)
+	UiStyle.style_label(detail_label, 34)
+	UiStyle.place(detail_label, DETAIL_RECT)
 
 func setup(money: int, crates: int) -> void:
-    amount_label.text = "+" + UiStyle.format_int(money)
-    UiStyle.fit_font(amount_label, 58)
-    detail_label.text = "%d %s" % [crates, "caixa" if crates == 1 else "caixas"]
+	amount_label.text = "+" + UiStyle.format_int(money)
+	UiStyle.fit_font(amount_label, 58)
+	detail_label.text = "%d %s" % [crates, "caixa" if crates == 1 else "caixas"]
 
 func get_text() -> String:
-    return "%s %s" % [amount_label.text, detail_label.text]
+	return "%s %s" % [amount_label.text, detail_label.text]
 
 ## Entrada com "pop", subida suave e saída por transparência; libera o nó no fim.
 func play(base_scale: float) -> void:
-    pivot_offset = size * 0.5
-    scale = Vector2.ONE * base_scale * 0.5
-    modulate.a = 0.0
-    var tween := create_tween().set_parallel(true)
-    tween.tween_property(self, "scale", Vector2.ONE * base_scale, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-    tween.tween_property(self, "modulate:a", 1.0, 0.15)
-    tween.tween_property(self, "position:y", position.y - rise, lifetime).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
-    var fade := create_tween()
-    fade.tween_interval(lifetime - 0.4)
-    fade.tween_property(self, "modulate:a", 0.0, 0.4)
-    fade.tween_callback(queue_free)
+	pivot_offset = size * 0.5
+	scale = Vector2.ONE * base_scale * 0.5
+	modulate.a = 0.0
+	var tween := create_tween().set_parallel(true)
+	tween.tween_property(self, "scale", Vector2.ONE * base_scale, 0.22).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "modulate:a", 1.0, 0.15)
+	tween.tween_property(self, "position:y", position.y - rise, lifetime).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	var fade := create_tween()
+	fade.tween_interval(lifetime - 0.4)
+	fade.tween_property(self, "modulate:a", 0.0, 0.4)
+	fade.tween_callback(queue_free)

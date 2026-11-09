@@ -1,4 +1,4 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud/farm_hud.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/components/PlayerLevelPanel.tscn" id="2_level"]
@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/components/InfoBanner.tscn" id="7_banner"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/components/StoreButton.tscn" id="8_store"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/components/RewardPopup.tscn" id="9_reward"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud/components/MessagePopup.tscn" id="10_message"]
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_script")
@@ -80,3 +81,5 @@ anchors_preset = 0
 mouse_filter = 2
 
 [node name="RewardPopup" parent="Root" instance=ExtResource("9_reward")]
+
+[node name="MessagePopup" parent="Root" instance=ExtResource("10_message")]

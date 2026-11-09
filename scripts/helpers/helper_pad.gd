@@ -13,6 +13,9 @@ class_name HelperPad
 ## e a cobrança continua de onde parou. Nada é devolvido nem cobrado a mais.
 
 signal purchased(grade: int)
+## Fazendeiro pisou numa plataforma bloqueada (área de cultura ainda sem
+## plantio). Emitido uma vez por entrada.
+signal locked_touched()
 ## Fazendeiro em cima, sem saldo para continuar.
 signal out_of_money(missing: int)
 
@@ -46,6 +49,7 @@ uniform float progress : hint_range(0.0, 1.0) = 0.0;
 uniform int grade = 0;
 uniform int max_grade = 5;
 uniform float pulse = 0.0;
+uniform float locked = 0.0;
 
 float box(vec2 p, vec2 half_size, float r) {
 	vec2 q = abs(p) - half_size + vec2(r);
@@ -74,12 +78,22 @@ void fragment() {
 		}
 	}
 	if (d > -border) { c = border_color.rgb; }
+	// Bloqueada: cores lavadas (sem cobrança até a área ter plantio).
+	float gray = dot(c, vec3(0.299, 0.587, 0.114));
+	c = mix(c, vec3(gray) * 0.85 + vec3(0.12), locked * 0.75);
 	ALBEDO = c * (1.0 + pulse * 0.25);
 }
 """
 
 var hiring: HelperHiring
 var wallet: Wallet
+## Áreas de milho e abóbora (CROP-AREAS-001): a plataforma aparece, mas não
+## cobra nem contrata enquanto a cultura não puder ser plantada.
+var locked := false:
+    set(value):
+        locked = value
+        _refresh()
+var _warned_locked := false
 ## Pegada XZ da plataforma (mundo).
 var rect := Rect2()
 ## Registro para testes: um item por dinheiro que voou {"from", "to"}.
@@ -183,6 +197,11 @@ func is_farmer_on_pad() -> bool:
 ## foram pagos neste frame.
 func process_farmer_position(world_pos: Vector3, delta: float) -> int:
     _farmer_on_pad = contains_point(world_pos)
+    if locked:
+        if _farmer_on_pad and not _warned_locked:
+            locked_touched.emit()
+        _warned_locked = _farmer_on_pad
+        return 0
     if not _farmer_on_pad or hiring == null or wallet == null or hiring.is_max():
         _on_pad_time = 0.0
         _pay_accumulator = 0.0
@@ -231,6 +250,12 @@ func _refresh() -> void:
     _cost_icon.visible = not is_max
     _cost_label.text = tr("HELPER_MAX") if is_max else UiStyle.format_int(maxi(cost - paid, 0))
     _cost_label.position.x = 0.0 if is_max else get_size().x * 0.12
+    _material.set_shader_parameter("locked", 1.0 if locked else 0.0)
+    _grade_label.visible = not locked
+    if locked:
+        _cost_icon.visible = false
+        _cost_label.text = tr("AREA_SOON")
+        _cost_label.position.x = 0.0
 
 func _launch_bundle(from: Vector3) -> void:
     if not is_inside_tree():

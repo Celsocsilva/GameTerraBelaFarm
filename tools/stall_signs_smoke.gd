@@ -78,7 +78,8 @@ func _run() -> void:
     _check(counter.take_units(8) == 8 and counter.get_stored_total() == 48, "take_units")
 
     # Placas de cultura.
-    _check(world.crop_signs.size() == 1, "uma placa por terreno (hoje só tomate): %d" % world.crop_signs.size())
+    # Uma placa por terreno: tomate + áreas extras (CROP-AREAS-001: milho e abóbora).
+    _check(world.crop_signs.size() == 1 + FarmWorld.CROP_AREAS.size(), "uma placa por terreno: %d" % world.crop_signs.size())
     var sign := world.get_crop_sign(&"tomato")
     _check(sign != null, "placa do tomate")
     var field := world.get_planting_area_rect()

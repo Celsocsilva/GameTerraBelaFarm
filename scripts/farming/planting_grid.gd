@@ -21,6 +21,8 @@ const STATE_HARVESTED := "HARVESTED"
 @export var rows_per_module: int = 9
 @export var row_spacing: float = 2.1
 @export var test_mode: bool = true
+## CROP-CORN-001: cultura das covas desta grade (cada cultura tem a sua grade).
+@export var crop_id: String = "tomato"
 
 var cells: Dictionary = {}
 var _cell_spacing := 1.0
@@ -54,7 +56,7 @@ func configure(modules: Array[Area3D]) -> void:
                     "module_id": module.name,
                     "row": row,
                     "column": column,
-                    "crop_id": "tomato",
+                    "crop_id": crop_id,
                     "cell_width": cell_width,
                     "cell_length": cell_length,
                     "position": module.to_global(local_offset),

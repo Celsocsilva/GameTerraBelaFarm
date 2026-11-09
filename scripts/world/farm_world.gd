@@ -38,6 +38,18 @@ const TOMATO_PILE_SCRIPT := preload("res://scripts/farming/tomato_pile.gd")
 const HELPER_PAD_SCRIPT := preload("res://scripts/helpers/helper_pad.gd")
 ## FV-PROPS-001: placa de madeira com o nome da cultura em cada terreno de plantio.
 const CROP_SIGN_SCRIPT := preload("res://scripts/farming/crop_sign.gd")
+## FV-WOOD-001: plantações de eucalipto (corte, toras e venda no balcão).
+const EUCALYPTUS_GROVE_SCRIPT := preload("res://scripts/forestry/eucalyptus_grove.gd")
+## Distância (m) entre as fileiras de eucalipto e a borda do terreno/rio.
+const EUCALYPTUS_EDGE_GAP := 1.9
+## Espaço entre duas árvores da mesma fileira (centro a centro).
+const EUCALYPTUS_SPACING := 2.6
+## Distância da fileira do rio à margem leste da água (margem ilustrada incluída).
+const EUCALYPTUS_RIVER_GAP := 1.2
+## FV-WOOD-002: floresta no canto sudoeste, ao sul da curva do rio, até a
+## borda do mapa (inclusive além da cerca do balcão). Grade hexagonal.
+const EUCALYPTUS_FOREST := Rect2(-30.5, 12.0, 18.0, 18.5)
+const EUCALYPTUS_FOREST_STEP := Vector2(2.4, 2.1)
 ## Placa no canto da frente (+Z, lado do balcão) à esquerda do terreno, na
 ## grama, fora do solo: não cobre as plantas nem o caminho até o balcão.
 const CROP_SIGN_OFFSET := Vector2(-0.9, 0.55)
@@ -87,6 +99,26 @@ const BUILDING_SIZE := Vector3(3.2, 2.2, 3.0)
 const EXTRA_PLOT_AREA_RATIO := 0.10
 const EXTRA_PLOT_STRIPS := 2
 const EXTRA_PLOT_GAP := 2.0
+## CROP-AREAS-001: áreas próprias de outras culturas, bem afastadas umas das
+## outras e do tomate. Cada uma tem o canteiro (tiras com a mesma arte do solo),
+## a placa da cultura (CropSign, automática pelo meta "crop"), a parcela de
+## estoque de 10% com a pilha da cultura (TomatoPile centrada) e a plataforma
+## de contratar o ajudante no chão (HelperPad + HelperHiring próprios).
+## `origin` é o canto de trás à esquerda (menor X e menor Z) do canteiro.
+## CROP-CORN-001: culturas em PLANTABLE_CROPS (o milho) ganham PlantingGrid,
+## HarvestController e ajudante próprios; as outras (abóbora) seguem sem
+## plantio, com a plataforma bloqueada ("Em breve").
+const CROP_AREAS := [
+    {"crop": &"corn", "origin": Vector2(19.0, -8.0)},
+    {"crop": &"pumpkin", "origin": Vector2(-4.0, -30.0)},
+]
+const CROP_AREA_STRIPS := 2
+## CROP-CORN-001: áreas extras que já têm arte de crescimento e plantio.
+const PLANTABLE_CROPS: Array[StringName] = [&"corn"]
+## Fileiras por tira nas áreas extras (tiras 0,75x: ~1,4 m entre covas).
+const CROP_AREA_ROWS := 6
+## Escala linear das tiras das novas áreas em relação às tiras do tomate.
+const CROP_AREA_SCALE := 0.75
 # Os módulos são contíguos nos dois eixos: uma área de cultivo é um agrupamento sem vãos.
 # Sobreposição controlada para ocultar qualquer margem transparente residual do PNG.
 var planting_plot_size: Vector2
@@ -122,8 +154,21 @@ var helper_hiring: HelperHiring
 var farm_helper: FarmHelper
 var tomato_pile: TomatoPile
 var helper_pad: HelperPad
+## CROP-AREAS-001: um item por área extra de cultura:
+## {"crop", "area" (Node3D), "field" (Rect2), "stock" (Rect2), "stock_area" (Node3D),
+##  "pad_rect" (Rect2), "pile" (TomatoPile), "hiring" (HelperHiring), "pad" (HelperPad)}.
+var crop_areas: Array[Dictionary] = []
+## CROP-CORN-001: grade, colheita e ajudante de cada cultura extra plantável
+## (crop -> PlantingGrid / HarvestController / FarmHelper).
+var crop_grids: Dictionary = {}
+var crop_harvesters: Dictionary = {}
+var crop_helpers: Dictionary = {}
+var _crop_busy_banner_shown := false
 ## Placas de cultura (FV-PROPS-001), uma por terreno de plantio.
 var crop_signs: Array[CropSign] = []
+## FV-WOOD-001: eucaliptos nas bordas dos canteiros e junto ao rio.
+var eucalyptus_grove: EucalyptusGrove
+var _wood_banner_shown := false
 ## Origem do punhado de sementes quando quem semeia é o ajudante.
 var _seed_origin_override: Variant = null
 
@@ -137,6 +182,7 @@ func _ready() -> void:
     _build_ground()
     _build_planting_area()
     _build_extra_planting_area()
+    _build_crop_areas()
     _build_planting_grid()
     _build_crop_signs()
     _build_obstacles()
@@ -145,6 +191,7 @@ func _ready() -> void:
     _build_harvest()
     _build_sales_counter()
     _build_helper()
+    _build_eucalyptus()
     _build_cozy_environment()
     _build_hud()
     _prewarm_seed_throw()
@@ -155,6 +202,8 @@ func _process(delta: float) -> void:
         _update_camera_focus(delta)
     if planting_grid and farmer:
         planting_grid.process_farmer_position(farmer.global_position, delta)
+        for grid in crop_grids.values():
+            (grid as PlantingGrid).process_farmer_position(farmer.global_position, delta)
     if sales_counter and farmer:
         sales_counter.process_farmer_position(farmer.global_position, get_farmer_hands_position())
     if money_stack and farmer:
@@ -163,6 +212,17 @@ func _process(delta: float) -> void:
         tomato_pile.process_farmer_position(farmer.global_position, harvest_inventory, backpack.intake_marker)
     if helper_pad and farmer:
         helper_pad.process_farmer_position(farmer.global_position, delta)
+    if farmer:
+        for entry in crop_areas:
+            if entry.has("pad"):
+                (entry["pad"] as HelperPad).process_farmer_position(farmer.global_position, delta)
+            if entry.has("pile"):
+                (entry["pile"] as TomatoPile).process_farmer_position(farmer.global_position, harvest_inventory, backpack.intake_marker)
+    if eucalyptus_grove and farmer:
+        eucalyptus_grove.process_farmer_position(farmer.global_position, delta)
+        _update_wood_hint()
+    if farmer and harvest_inventory:
+        _update_crop_busy_hint()
 
 func get_farmer_hands_position() -> Vector3:
     return farmer.global_transform * HANDS_OFFSET
@@ -182,6 +242,9 @@ func _build_cozy_environment() -> void:
         cozy_environment.reserved_areas.append(river_system)
     for rect in get_obstacle_rects():
         cozy_environment.blocked_rects.append(rect)
+    if eucalyptus_grove:
+        for tree in eucalyptus_grove.trees:
+            cozy_environment.blocked_rects.append(Rect2(Vector2(tree.position.x, tree.position.z) - Vector2(1.3, 1.0), Vector2(2.6, 2.0)))
     add_child(cozy_environment)
     cozy_environment.setup(
         $Ground/GrassSurface as MeshInstance3D,
@@ -261,6 +324,14 @@ func get_obstacle_rects() -> Array[Rect2]:
         rects.append(Rect2(Vector2(center.x, center.z) - half, half * 2.0))
     rects.append(get_extra_plot_rect().grow(1.0))
     rects.append(get_helper_pad_rect().grow(0.8))
+    # ENV-FENCE-001: faixa das cercas do balcão (a arte sobe na tela; arbustos
+    # logo atrás dela ficavam cobertos pela cerca).
+    if sales_counter:
+        rects.append(Rect2(-farm_size * 0.5, sales_counter.position.z - 1.8, farm_size, 2.4))
+    for entry in crop_areas:
+        rects.append((entry["field"] as Rect2).grow(1.0))
+        rects.append((entry["stock"] as Rect2).grow(1.0))
+        rects.append((entry["pad_rect"] as Rect2).grow(0.8))
     for sign in crop_signs:
         rects.append(Rect2(Vector2(sign.position.x, sign.position.z) - Vector2(1.3, 0.6), Vector2(2.6, 1.2)))
     return rects
@@ -289,6 +360,272 @@ func _build_extra_planting_area() -> void:
         var centered_column := index - (EXTRA_PLOT_STRIPS - 1) * 0.5
         visual.position = Vector3(centered_column * planting_plot_spacing.x * s, 0.0, 0.0)
         extra_planting_area.add_child(visual)
+
+## Escala linear (relativa às tiras do tomate) de uma parcela de
+## EXTRA_PLOT_STRIPS tiras com a área pedida (m²).
+func get_patch_strip_scale(target_area: float) -> float:
+    var overlap_ratio := PLANTING_PLOT_OVERLAP / PLANTING_PLOT_WIDTH
+    var unit_width := float(EXTRA_PLOT_STRIPS) - overlap_ratio * float(EXTRA_PLOT_STRIPS - 1)
+    return sqrt(target_area / (unit_width * PLANTING_PLOT_WIDTH * planting_plot_size.y))
+
+## Tamanho XZ de uma parcela de `strips` tiras na escala `s`.
+func get_patch_size(strips: int, s: float) -> Vector2:
+    var overlap_ratio := PLANTING_PLOT_OVERLAP / PLANTING_PLOT_WIDTH
+    return Vector2(PLANTING_PLOT_WIDTH * s * (float(strips) - overlap_ratio * float(strips - 1)), planting_plot_size.y * s)
+
+## Geometria de uma área de cultura extra (CROP-AREAS-001), em XZ do mundo:
+## canteiro a partir de `origin`; estoque (10% da área) a leste, alinhado ao
+## centro; plataforma do ajudante logo depois do estoque, no sentido do balcão.
+func get_crop_area_layout(origin: Vector2) -> Dictionary:
+    var field := Rect2(origin, get_patch_size(CROP_AREA_STRIPS, CROP_AREA_SCALE))
+    var stock_size := get_patch_size(EXTRA_PLOT_STRIPS, get_patch_strip_scale(EXTRA_PLOT_AREA_RATIO * field.get_area()))
+    var stock_center := Vector2(field.end.x + EXTRA_PLOT_GAP + stock_size.x * 0.5, field.get_center().y)
+    var stock := Rect2(stock_center - stock_size * 0.5, stock_size)
+    var pad_size := HelperPad.get_size()
+    var pad_center := Vector2(stock_center.x, stock.end.y + HELPER_PAD_GAP + pad_size.y * 0.5)
+    return {"field": field, "stock": stock, "pad_rect": Rect2(pad_center - pad_size * 0.5, pad_size)}
+
+## Monta o solo das áreas extras: canteiro (Area3D por tira, com meta "crop"
+## para a placa) e a parcela de estoque. Sem PlantingGrid por enquanto.
+func _build_crop_areas() -> void:
+    var main_soil := ($PlantingArea.get_child(0) as Node3D).get_node("PlowedSoil") as MeshInstance3D
+    var main_quad := main_soil.mesh as QuadMesh
+    for spec in CROP_AREAS:
+        var crop: StringName = spec["crop"]
+        var layout := get_crop_area_layout(spec["origin"])
+        var field: Rect2 = layout["field"]
+        var area := Node3D.new()
+        area.name = "CropArea_%s" % String(crop).capitalize()
+        area.set_meta("crop", String(crop))
+        area.set_meta("is_crop_group", true)
+        area.set_meta("plot_count", CROP_AREA_STRIPS)
+        var plantable := PLANTABLE_CROPS.has(crop)
+        area.set_meta("plantable", plantable)
+        add_child(area)
+        var s := CROP_AREA_SCALE
+        for index in CROP_AREA_STRIPS:
+            var plot := Area3D.new()
+            # Nomes únicos por cultura: os ids das covas ("<tira>_rNN_cNN") não
+            # podem colidir com os do tomate no mapa compartilhado `crops`.
+            plot.name = ("%sPlot_%02d" % [String(crop).capitalize(), index + 1]) if plantable else ("PlantingPlot_%02d" % (index + 1))
+            plot.monitoring = false
+            plot.monitorable = false
+            plot.set_meta("plot_index", index)
+            plot.set_meta("crop", String(crop))
+            var centered_column := index - (CROP_AREA_STRIPS - 1) * 0.5
+            plot.position = Vector3(field.get_center().x + centered_column * planting_plot_spacing.x * s, 0.025, field.get_center().y)
+            var visual := MeshInstance3D.new()
+            visual.name = "PlowedSoil"
+            var quad := QuadMesh.new()
+            quad.size = main_quad.size * s
+            visual.mesh = quad
+            visual.material_override = main_soil.material_override
+            visual.rotation_degrees.x = -90.0
+            plot.add_child(visual)
+            var collision := CollisionShape3D.new()
+            collision.name = "CollisionShape3D"
+            var shape := BoxShape3D.new()
+            shape.size = Vector3(PLANTING_PLOT_WIDTH * s, 0.1, planting_plot_size.y * s)
+            collision.shape = shape
+            collision.position.y = -0.025
+            collision.disabled = not plantable
+            plot.add_child(collision)
+            area.add_child(plot)
+        var stock: Rect2 = layout["stock"]
+        var stock_area := Node3D.new()
+        stock_area.name = "StockArea_%s" % String(crop).capitalize()
+        stock_area.set_meta("role", "%s_pile" % crop)
+        stock_area.position = Vector3(stock.get_center().x, 0.025, stock.get_center().y)
+        add_child(stock_area)
+        var t := get_patch_strip_scale(EXTRA_PLOT_AREA_RATIO * field.get_area())
+        for index in EXTRA_PLOT_STRIPS:
+            var patch := MeshInstance3D.new()
+            patch.name = "PlowedSoil_%02d" % (index + 1)
+            var patch_quad := QuadMesh.new()
+            patch_quad.size = main_quad.size * t
+            patch.mesh = patch_quad
+            patch.material_override = main_soil.material_override
+            patch.rotation_degrees.x = -90.0
+            var column := index - (EXTRA_PLOT_STRIPS - 1) * 0.5
+            patch.position = Vector3(column * planting_plot_spacing.x * t, 0.0, 0.0)
+            stock_area.add_child(patch)
+        var entry := layout.duplicate()
+        entry["crop"] = crop
+        entry["area"] = area
+        entry["stock_area"] = stock_area
+        crop_areas.append(entry)
+
+## Pilha de estoque e plataforma do ajudante de cada área extra (depois da
+## Wallet). A plataforma fica bloqueada enquanto a cultura não tem plantio.
+func _build_crop_area_services() -> void:
+    for entry in crop_areas:
+        var crop: StringName = entry["crop"]
+        var label := String(crop).capitalize()
+        var pile := TOMATO_PILE_SCRIPT.new() as TomatoPile
+        pile.name = "CropPile_%s" % label
+        pile.item_id = crop
+        pile.centered = true
+        add_child(pile)
+        pile.setup(entry["stock"], harvest_inventory.units_per_crate)
+        var hiring := HELPER_HIRING_SCRIPT.new() as HelperHiring
+        hiring.name = "HelperHiring_%s" % label
+        add_child(hiring)
+        var pad := HELPER_PAD_SCRIPT.new() as HelperPad
+        pad.name = "HelperPad_%s" % label
+        add_child(pad)
+        pad.setup((entry["pad_rect"] as Rect2).get_center(), hiring, wallet)
+        pad.locked = not bool((entry["area"] as Node3D).get_meta("plantable", false))
+        entry["pile"] = pile
+        entry["hiring"] = hiring
+        entry["pad"] = pad
+        if crop_grids.has(crop):
+            var helper := FARM_HELPER_SCRIPT.create() as FarmHelper
+            helper.name = "FarmHelper_%s" % label
+            add_child(helper)
+            helper.setup(crop_grids[crop], crops, pile, hiring, self, harvest_inventory.units_per_crate)
+            crop_helpers[crop] = helper
+            entry["helper"] = helper
+
+## FV-WOOD-001: fileiras de eucalipto nas bordas de trás (norte) e oeste do
+## canteiro de tomate e das áreas de milho e abóbora, e uma fileira ao longo da
+## margem leste do rio (lado da fazenda). Nada na frente dos canteiros (lado do
+## balcão), no corredor central de acesso, nas pontes, perto do balcão ou fora
+## do terreno.
+func get_eucalyptus_points() -> Array[Vector3]:
+    var candidates: Array[Vector2] = []
+    var fields: Array[Rect2] = [get_planting_area_rect()]
+    for entry in crop_areas:
+        fields.append(entry["field"] as Rect2)
+    for field in fields:
+        _append_row(candidates, Vector2(field.position.x, field.position.y - EUCALYPTUS_EDGE_GAP), Vector2(field.end.x, field.position.y - EUCALYPTUS_EDGE_GAP))
+        _append_row(candidates, Vector2(field.position.x - EUCALYPTUS_EDGE_GAP, field.position.y), Vector2(field.position.x - EUCALYPTUS_EDGE_GAP, field.end.y - 1.0))
+    if river_system:
+        var z := -farm_size * 0.5 + 2.0
+        while z < farm_size * 0.5 - 2.0:
+            var bank := _river_east_bank(z)
+            if bank > -INF:
+                # Se a margem estiver ocupada (cabeceira de ponte), tenta 1 m mais para dentro.
+                candidates.append(Vector2(bank + EUCALYPTUS_RIVER_GAP, z))
+                candidates.append(Vector2(bank + EUCALYPTUS_RIVER_GAP + 1.0, z))
+            z += EUCALYPTUS_SPACING
+    var row := 0
+    var fz := EUCALYPTUS_FOREST.position.y
+    while fz <= EUCALYPTUS_FOREST.end.y:
+        var fx := EUCALYPTUS_FOREST.position.x + (EUCALYPTUS_FOREST_STEP.x * 0.5 if row % 2 == 1 else 0.0)
+        while fx <= EUCALYPTUS_FOREST.end.x:
+            # Desvio fixo (determinístico) para a floresta não parecer um tabuleiro.
+            var jitter := Vector2(sin(fx * 12.9898 + fz * 78.233), sin(fx * 39.346 + fz * 11.135)) * 0.3
+            candidates.append(Vector2(fx, fz) + jitter)
+            fx += EUCALYPTUS_FOREST_STEP.x
+        fz += EUCALYPTUS_FOREST_STEP.y
+        row += 1
+    var points: Array[Vector3] = []
+    for candidate in candidates:
+        if not _eucalyptus_allowed(candidate):
+            continue
+        var crowded := false
+        for other in points:
+            if Vector2(other.x, other.z).distance_to(candidate) < 1.8:
+                crowded = true
+                break
+        if not crowded:
+            points.append(Vector3(candidate.x, 0.0, candidate.y))
+    return points
+
+func _append_row(out: Array[Vector2], from: Vector2, to: Vector2) -> void:
+    var length := from.distance_to(to)
+    var count := maxi(1, int(floor(length / EUCALYPTUS_SPACING)) + 1)
+    # Zigue-zague leve (perpendicular à fileira): as copas não se empilham numa
+    # torre só e a fileira parece plantada à mão.
+    var side := (to - from).normalized().orthogonal() if length > 0.01 else Vector2.ZERO
+    for index in count:
+        var t := 0.0 if count == 1 else float(index) / float(count - 1)
+        out.append(from.lerp(to, t) + side * (0.45 if index % 2 == 0 else -0.45))
+
+## X da borda leste do rio (tiles com a margem ilustrada, sem as pontes) na
+## linha z, só na metade oeste do mapa; -INF se a linha não cruza o rio.
+func _river_east_bank(z: float) -> float:
+    var bank := -INF
+    for segment in river_system.segments:
+        var rect := river_system.get_segment_rect(segment)
+        if z >= rect.position.y and z <= rect.end.y and rect.end.x < 0.0:
+            bank = maxf(bank, rect.end.x)
+    return bank
+
+func _eucalyptus_allowed(point: Vector2) -> bool:
+    var edge := farm_size * 0.5 - 1.5
+    if absf(point.x) > edge or absf(point.y) > edge:
+        return false
+    var main := get_planting_area_rect()
+    # Corredor central de acesso ao canteiro (o mesmo do CozyEnvironment).
+    if absf(point.x) < 3.4 and point.y > main.position.y - 10.3 and point.y < main.end.y:
+        return false
+    if Vector2(farmer.position.x, farmer.position.z).distance_to(point) < 2.0:
+        return false
+    if sales_counter:
+        var counter := Vector2(sales_counter.position.x, sales_counter.position.z)
+        if point.distance_to(counter) < 7.0 or (point.y > counter.y - 6.0 and absf(point.x) < 12.0):
+            return false
+    # Árvore provisória (primitiva) a sudoeste do canteiro.
+    if point.distance_to(Vector2(-10.0, 10.0)) < 2.6:
+        return false
+    for rect in get_obstacle_rects():
+        if rect.has_point(point):
+            return false
+    if river_system and river_system.blocks_decoration(Vector3(point.x, 0.0, point.y), 0.6):
+        return false
+    return true
+
+func _build_eucalyptus() -> void:
+    eucalyptus_grove = EUCALYPTUS_GROVE_SCRIPT.new() as EucalyptusGrove
+    eucalyptus_grove.name = "EucalyptusGrove"
+    add_child(eucalyptus_grove)
+    eucalyptus_grove.setup(get_eucalyptus_points(), harvest_inventory, backpack.intake_marker)
+
+## Avisos da madeira: corte bloqueado (mochila com tomates ou cheia) e, com
+## toras na mochila, lembrete de vender no balcão ao entrar num canteiro.
+func _on_chop_blocked(reason: StringName) -> void:
+    if hud:
+        hud.show_banner(tr("WOOD_BACKPACK_BUSY") if reason == &"other_item" else tr("WOOD_BACKPACK_FULL"), 2.0)
+
+func _update_wood_hint() -> void:
+    var carrying_wood := harvest_inventory.get_amount(WoodConfig.ITEM) > 0
+    var in_field := get_planting_area_rect().has_point(Vector2(farmer.global_position.x, farmer.global_position.z))
+    if carrying_wood and in_field:
+        if not _wood_banner_shown and hud:
+            _wood_banner_shown = true
+            hud.show_banner(tr("WOOD_SELL_FIRST"), 2.0)
+    else:
+        _wood_banner_shown = false
+
+## CROP-CORN-001: dentro de um canteiro com a mochila ocupada por OUTRO
+## produto (ex.: tomates no milharal), avisa uma vez que é preciso vender no
+## balcão antes de colher. Madeira no canteiro de tomate já tem aviso próprio.
+func _update_crop_busy_hint() -> void:
+    var here := Vector2(farmer.global_position.x, farmer.global_position.z)
+    var field_crop: StringName = &""
+    if get_planting_area_rect().has_point(here):
+        field_crop = &"tomato"
+    else:
+        for entry in crop_areas:
+            if crop_grids.has(entry["crop"]) and (entry["field"] as Rect2).has_point(here):
+                field_crop = entry["crop"]
+    var busy := field_crop != &"" and not harvest_inventory.can_accept(field_crop)
+    if busy and harvest_inventory.get_amount(WoodConfig.ITEM) > 0 and field_crop == &"tomato":
+        busy = false
+    if busy:
+        if not _crop_busy_banner_shown and hud:
+            _crop_busy_banner_shown = true
+            hud.show_banner(tr("HARVEST_SELL_FIRST") % tr(String(CropSign.CROPS[field_crop]["key"])).to_lower(), 2.0)
+    else:
+        _crop_busy_banner_shown = false
+
+## Área extra de uma cultura (vazio se não houver).
+func get_crop_area(crop: StringName) -> Dictionary:
+    for entry in crop_areas:
+        if entry["crop"] == crop:
+            return entry
+    return {}
 
 ## Uma placa por terreno de plantio (agrupamento com meta is_crop_group). A
 ## cultura vem do meta "crop" do terreno: trocar para "corn" ou "pumpkin"
@@ -342,9 +679,40 @@ func _build_planting_grid() -> void:
             modules.append(child)
     planting_grid.configure(modules)
     planting_grid.cell_planted.connect(_on_grid_cell_planted)
+    for entry in crop_areas:
+        var area := entry["area"] as Node3D
+        if not bool(area.get_meta("plantable", false)):
+            continue
+        var crop: StringName = entry["crop"]
+        var grid := PLANTING_GRID_SCRIPT.new() as PlantingGrid
+        grid.name = "PlantingGrid_%s" % String(crop).capitalize()
+        grid.crop_id = String(crop)
+        grid.rows_per_module = CROP_AREA_ROWS
+        add_child(grid)
+        var crop_modules: Array[Area3D] = []
+        for child in area.get_children():
+            if child is Area3D:
+                crop_modules.append(child)
+        grid.configure(crop_modules)
+        grid.cell_planted.connect(_on_grid_cell_planted)
+        crop_grids[crop] = grid
+        entry["grid"] = grid
+
+## Grade (tomate ou cultura extra) dona da cova `cell_id`.
+func get_grid_for_cell(cell_id: String) -> PlantingGrid:
+    if planting_grid and planting_grid.cells.has(cell_id):
+        return planting_grid
+    for grid in crop_grids.values():
+        if (grid as PlantingGrid).cells.has(cell_id):
+            return grid
+    return planting_grid
+
+## Grade de uma cultura (tomate = planting_grid; null se não for plantável).
+func get_crop_grid(crop: StringName) -> PlantingGrid:
+    return planting_grid if crop == &"tomato" else crop_grids.get(crop) as PlantingGrid
 
 func _on_grid_cell_planted(cell_id: String) -> void:
-    var cell: Dictionary = planting_grid.cells[cell_id]
+    var cell: Dictionary = get_grid_for_cell(cell_id).cells[cell_id]
     var seed_throw := SEED_THROW_SCENE.instantiate() as SeedThrow
     add_child(seed_throw)
     # O broto nasce quando o punhado toca o sulco, não no momento do arremesso.
@@ -356,7 +724,7 @@ func _on_grid_cell_planted(cell_id: String) -> void:
 ## semeadura do fazendeiro: PlantingGrid.plant_cell -> punhado -> broto.
 func plant_cell_from(cell_id: String, origin: Vector3) -> bool:
     _seed_origin_override = origin
-    var ok := planting_grid.plant_cell(cell_id)
+    var ok := get_grid_for_cell(cell_id).plant_cell(cell_id)
     _seed_origin_override = null
     return ok
 
@@ -378,6 +746,7 @@ func _build_helper() -> void:
     helper_pad.name = "HelperPad"
     add_child(helper_pad)
     helper_pad.setup(get_helper_pad_rect().get_center(), helper_hiring, wallet)
+    _build_crop_area_services()
 
 ## Pegada XZ da plataforma do ajudante: centrada na parcela extra (X), logo
 ## depois dela no sentido do balcão (+Z), por onde o fazendeiro passa.
@@ -397,9 +766,12 @@ func _prewarm_seed_throw() -> void:
     warmup.launch(Vector3(0.0, -40.0, 0.0), Vector3(0.5, -40.0, 0.5))
 
 func _spawn_crop(_landing: Vector3, cell_id: String) -> CropPlant:
-    var cell: Dictionary = planting_grid.cells[cell_id]
+    var cell: Dictionary = get_grid_for_cell(cell_id).cells[cell_id]
     var crop := CROP_PLANT_SCRIPT.new() as CropPlant
     crop.name = "Crop_" + cell_id
+    crop.crop_id = StringName(cell.get("crop_id", "tomato"))
+    if crop.crop_id != &"tomato":
+        crop.stage_heights = CropCatalog.stage_heights(crop.crop_id)
     crop.position = cell["position"]
     crop.cell_width = cell["cell_width"]
     add_child(crop)
@@ -410,8 +782,9 @@ func _spawn_crop(_landing: Vector3, cell_id: String) -> CropPlant:
 
 ## Planta já num estágio (ferramentas de teste/captura). Estágio final => RIPE.
 func spawn_crop_at_stage(cell_id: String, stage: int) -> CropPlant:
-    if planting_grid.cells[cell_id]["state"] == "EMPTY":
-        planting_grid.cells[cell_id]["state"] = "SEEDED"
+    var grid := get_grid_for_cell(cell_id)
+    if grid.cells[cell_id]["state"] == "EMPTY":
+        grid.cells[cell_id]["state"] = "SEEDED"
     var crop := _spawn_crop(Vector3.ZERO, cell_id)
     # planted_at = 0 congela o crescimento no estágio pedido.
     crop.planted_at = 0.0
@@ -419,7 +792,9 @@ func spawn_crop_at_stage(cell_id: String, stage: int) -> CropPlant:
     return crop
 
 func _on_crop_ready(cell_id: String) -> void:
-    planting_grid.mark_ripe(cell_id, harvest_controller.yield_per_crop)
+    var grid := get_grid_for_cell(cell_id)
+    var controller: HarvestController = harvest_controller if grid == planting_grid else crop_harvesters.get(StringName(grid.crop_id), harvest_controller)
+    grid.mark_ripe(cell_id, controller.yield_per_crop)
 
 func _build_harvest() -> void:
     harvest_inventory = HARVEST_INVENTORY_SCRIPT.new() as HarvestInventory
@@ -437,12 +812,25 @@ func _build_harvest() -> void:
     add_child(harvest_controller)
     harvest_controller.setup(planting_grid, harvest_inventory, farmer, backpack.intake_marker, crops, self)
     planting_grid.cell_state_changed.connect(_on_cell_state_changed)
+    # CROP-CORN-001: uma colheita por cultura extra, na mesma mochila (que
+    # aceita um produto por vez: HarvestInventory.can_accept).
+    for crop in crop_grids:
+        var controller := HARVEST_CONTROLLER_SCRIPT.new() as HarvestController
+        controller.name = "HarvestController_%s" % String(crop).capitalize()
+        controller.item_id = crop
+        controller.yield_per_crop = CropCatalog.yield_per_crop(crop)
+        controller.min_visual_tomatoes = 2
+        controller.max_visual_tomatoes = 3
+        add_child(controller)
+        controller.setup(crop_grids[crop], harvest_inventory, farmer, backpack.intake_marker, crops, self)
+        (crop_grids[crop] as PlantingGrid).cell_state_changed.connect(_on_cell_state_changed)
+        crop_harvesters[crop] = controller
 
 func _on_cell_state_changed(cell_id: String, state: String) -> void:
     if state == PlantingGrid.STATE_HARVESTED and crops.has(cell_id):
         (crops[cell_id] as CropPlant).queue_free()
         crops.erase(cell_id)
-        planting_grid.reset_if_fully_harvested()
+        get_grid_for_cell(cell_id).reset_if_fully_harvested()
 
 func _build_environment() -> void:
     var environment := WorldEnvironment.new()
@@ -541,7 +929,7 @@ func _build_planting_area() -> void:
         planting_area.add_child(plot)
 
 func _build_obstacles() -> void:
-    _add_box_obstacle("Fence", FENCE_SIZE, FENCE_POSITION, Color(0.65, 0.38, 0.16))
+    _add_fence("Fence", FENCE_POSITION, FENCE_SIZE)
     _add_box_obstacle("Building", BUILDING_SIZE, BUILDING_POSITION, Color(0.72, 0.30, 0.18))
     # A árvore fica fora do agrupamento contínuo de cultivo de tomate.
     _add_tree(Vector3(-10, 0, 10))
@@ -574,6 +962,27 @@ func _add_tree(position: Vector3) -> void:
     collision.position = position + Vector3(0, 1.0, 0)
     body.add_child(collision)
     add_child(body)
+
+## ENV-FENCE-001: cerca de madeira com a arte do projeto (FenceRun) no lugar da
+## caixa marrom provisória. A colisão continua a mesma caixa (FENCE_SIZE).
+func _add_fence(label: String, position: Vector3, size: Vector3) -> StaticBody3D:
+    var body := StaticBody3D.new()
+    body.name = label
+    body.position = position
+    var fence := FenceRun.new()
+    fence.name = "FenceRun"
+    fence.length = size.x
+    # A arte nasce no chão (o corpo fica a meia altura da colisão).
+    fence.position.y = -position.y
+    body.add_child(fence)
+    var collision := CollisionShape3D.new()
+    collision.name = "CollisionShape3D"
+    var shape := BoxShape3D.new()
+    shape.size = size
+    collision.shape = shape
+    body.add_child(collision)
+    add_child(body)
+    return body
 
 func _add_box_obstacle(label: String, size: Vector3, position: Vector3, color: Color) -> void:
     var body := StaticBody3D.new()
@@ -639,7 +1048,17 @@ func _build_hud() -> void:
     hud.setup(wallet, harvest_inventory, sales_controller, player_level, mission_tracker)
     mission_tracker.setup(harvest_inventory, sales_controller, wallet, player_level)
     helper_pad.purchased.connect(_on_helper_purchased)
+    eucalyptus_grove.chop_blocked.connect(_on_chop_blocked)
+    # A estação inicial já está nas árvores; o aviso só aparece se ela virar com o jogo aberto.
+    eucalyptus_grove.season_changed.connect(func(season: StringName) -> void: hud.show_banner(tr("SEASON_CHANGED") % tr(SeasonClock.label_key(season)), 2.4))
     helper_pad.out_of_money.connect(func(missing: int) -> void: hud.show_banner(tr("HELPER_NO_MONEY") % missing, 2.0))
+    for entry in crop_areas:
+        var crop_key := String(CropSign.CROPS[entry["crop"]]["key"]) if CropSign.has_crop(entry["crop"]) else String(entry["crop"])
+        var pad := entry["pad"] as HelperPad
+        pad.locked_touched.connect(func() -> void: hud.show_banner(tr("AREA_SOON_BANNER") % tr(crop_key), 1.8))
+        if crop_grids.has(entry["crop"]):
+            pad.purchased.connect(func(grade: int) -> void: hud.show_banner(tr("HELPER_HIRED_%s" % String(entry["crop"]).to_upper()) if grade == 1 else tr("HELPER_UPGRADED") % grade, 2.2))
+            pad.out_of_money.connect(func(missing: int) -> void: hud.show_banner(tr("HELPER_NO_MONEY") % missing, 2.0))
 
 func _on_helper_purchased(grade: int) -> void:
     if grade == 1:

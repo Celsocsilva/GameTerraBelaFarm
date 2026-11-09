@@ -14,3 +14,19 @@ CROP_PUMPKIN,Abóbora,Calabaza,Pumpkin
 REWARD_TITLE,Recompensa!,¡Recompensa!,Reward!
 REWARD_MISSION_COMPLETE,Missão concluída!,¡Misión completada!,Quest complete!
 REWARD_COLLECT,Coletar,Recoger,Collect
+MESSAGE_OK,OK,OK,OK
+HELP_HELPER_TITLE,Ajudante,Ayudante,Helper
+HELP_HELPER_TEXT,Pare no quadro para contratar. Ele colhe e guarda para você.,Párate en el cuadro para contratar. Cosecha y guarda por ti.,Stand on the board to hire. They harvest and store for you.
+AREA_SOON,Em breve,Pronto,Soon
+AREA_SOON_BANNER,%s em breve!,¡%s pronto!,%s coming soon!
+WOOD_NAME,Madeira,Madera,Wood
+WOOD_BACKPACK_BUSY,"Mochila com a colheita: venda no balcão antes de cortar eucalipto","Mochila con la cosecha: vende en el puesto antes de talar eucaliptos","Backpack holds your harvest: sell it at the stall before chopping eucalyptus"
+WOOD_BACKPACK_FULL,Mochila cheia: venda as toras no balcão,Mochila llena: vende los troncos en el puesto,Backpack full: sell the logs at the stall
+WOOD_SELL_FIRST,Venda as toras no balcão antes de colher,Vende los troncos en el puesto antes de cosechar,Sell the logs at the stall before harvesting
+SEASON_SPRING,Primavera,Primavera,Spring
+SEASON_SUMMER,Verão,Verano,Summer
+SEASON_AUTUMN,Outono,Otoño,Autumn
+SEASON_WINTER,Inverno,Invierno,Winter
+SEASON_CHANGED,%s chegou: os eucaliptos mudaram,Llegó %s: los eucaliptos cambiaron,%s is here: the eucalyptus trees changed
+HELPER_HIRED_CORN,Ajudante do milho contratado! Ele colhe e empilha o milho na parcela.,¡Ayudante del maíz contratado! Cosecha y apila el maíz en la parcela.,Corn helper hired! They harvest and stack the corn on the plot.
+HARVEST_SELL_FIRST,Mochila ocupada: venda no balcão antes de colher %s,Mochila ocupada: vende en el puesto antes de cosechar %s,Backpack busy: sell at the stall before harvesting %s
