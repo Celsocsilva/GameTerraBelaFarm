@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- FV-SHOP-001: modal da Loja com 5 categorias e 15 ofertas conceituais, traduções PT/ES/EN e ações de navegação; IAP real desabilitado até integração segura. Testes em `tools/shop_smoke.gd`; detalhes em `docs/IAP_SHOP.md`.
+
 - CROP-CORN-001: cultivo do milho na área de milho. Quatro estágios em `assets/crops/corn/stages/` (broto, jovem com cinco folhas, com uma espiga, maduro com duas espigas), grade de plantio própria (2 tiras x 3 sulcos x 6 fileiras), colheita com espigas voando para a mochila (4 por pé, provisório), caixa de milho (`assets/harvest/crate_corn_full.png`), pilha na parcela de estoque, plataforma do ajudante liberada (ajudante próprio que colhe, empilha e replanta) e venda no balcão na vaga reservada ao milho (esquerda; caixa a 4, provisório). A madeira passou para a vaga da direita, e os fardos usam as artes de toras editadas por Celso em `assets/items/logs/`. Dados das culturas em `scripts/farming/crop_catalog.gd`; aviso "Mochila ocupada" (PT/ES/EN) ao entrar num canteiro com outro produto na mochila. A abóbora segue "Em breve". Teste `tools/corn_smoke.gd`, capturas `tools/corn_capture.gd`, evidências em `docs/evidence/corn-001/`.
 
 - FV-WOOD-002: floresta densa de eucaliptos no canto sudoeste, ao sul do rio e além da cerca do balcão (60 árvores no total); pontes e rampas com as artes novas de frente (mesmos nomes em `assets/bridges/`, pontos de tabuleiro, arco, corrimão e acessos refeitos nas cenas); corte em 3 golpes do machado animado (quadros do GIF) com os estágios entalhe, corte fundo, inclinada, caída e toco com toras, e só então as toras vão para a mochila. Teste `tools/wood_smoke.gd` e `tools/river_smoke.gd`, evidências em `docs/evidence/wood-001/`.
