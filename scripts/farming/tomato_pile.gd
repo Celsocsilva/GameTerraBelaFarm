@@ -31,6 +31,15 @@ const JUMP_TIME := 0.4
 const JUMP_HEIGHT := 1.4
 ## Intervalo entre duas caixas recolhidas pelo fazendeiro.
 const PICKUP_INTERVAL := 0.12
+## FV-POLISH-001: pilha organizada da área de coleta dos ajudantes — camadas de
+## 3 colunas (horizontal) x 3 fileiras (profundidade), uma camada sobre a outra.
+## Com MAX_CRATES = 27 a pilha cheia é um bloco 3 x 3 x 3, sem contador "xN".
+const GRID_COLUMNS := 3
+const GRID_ROWS := 3
+const GRID_CRATE_WIDTH := 1.15
+## Centro a centro: X entre colunas e Z entre fileiras (a de trás aparece logo
+## acima da da frente na tela, como caixas arrumadas no chão).
+const GRID_SPACING := Vector2(1.18, 1.45)
 
 @export_range(1, 64, 1) var units_per_crate: int = 8
 @export var item_id: StringName = &"tomato"
@@ -44,6 +53,9 @@ const PICKUP_INTERVAL := 0.12
 ## de ItemArt pelo item_id.
 @export_range(0.3, 3.0, 0.01) var crate_width: float = CRATE_WIDTH
 @export_range(1, 999, 1) var max_crates: int = MAX_CRATES
+## FV-POLISH-001: true nas parcelas de estoque dos ajudantes (grade 3 x 3 por
+## camada); false no balcão (uma coluna, como antes).
+@export var grid_layout: bool = false
 
 ## Pegada XZ da parcela (mundo).
 var rect := Rect2()
@@ -66,8 +78,14 @@ func setup(plot_rect: Rect2, crate_units: int) -> void:
     if _count_label:
         _count_label.position = _count_label_local()
 
+## Caixas desenhadas: na grade todas (até max_crates); na coluna, VISUAL_MAX.
+func get_visual_max() -> int:
+    return max_crates if grid_layout else VISUAL_MAX
+
 func _ready() -> void:
-    for index in VISUAL_MAX:
+    if grid_layout:
+        crate_width = GRID_CRATE_WIDTH
+    for index in get_visual_max():
         var crate := Node3D.new()
         crate.name = "PileCrate_%02d" % index
         crate.set_meta("index", index)
@@ -182,7 +200,7 @@ func process_farmer_position(world_pos: Vector3, inventory: HarvestInventory, ta
 
 func _refresh() -> void:
     var count := get_crate_count()
-    var shown := mini(count, VISUAL_MAX)
+    var shown := mini(count, get_visual_max())
     var partial := _stored % units_per_crate != 0
     for index in _crates.size():
         var crate := _crates[index]
@@ -193,13 +211,15 @@ func _refresh() -> void:
         if sprite.texture != texture:
             _apply_texture(sprite, texture)
     if _count_label:
-        var text := CrateStack.count_text(count, VISUAL_MAX)
+        var text := CrateStack.count_text(count, get_visual_max())
         _count_label.text = text
         _count_label.visible = text != ""
 
 ## Pilha única da cultura (item_id), no centro da parcela; índices além do
 ## limite visual pousam no topo.
 func _slot_local(index: int) -> Vector3:
+    if grid_layout:
+        return _grid_slot_local(index)
     var layer := CrateStack.visual_index(index, VISUAL_MAX)
     var spacing := STACK_SPACING
     if rect.size.x > 0.0:
@@ -207,15 +227,36 @@ func _slot_local(index: int) -> Vector3:
     var x := 0.0 if centered else CrateStack.slot_x(item_id, spacing)
     return Vector3(x, float(layer) * crate_width * 0.54, float(layer) * 0.03)
 
+## Grade 3 x 3 por camada: preenche a fileira de trás primeiro (da esquerda
+## para a direita), depois a do meio e a da frente; a camada seguinte sobe
+## apoiada na borda das de baixo. A última caixa é sempre a do topo, que o
+## fazendeiro recolhe primeiro.
+func _grid_slot_local(index: int) -> Vector3:
+    var per_layer := GRID_COLUMNS * GRID_ROWS
+    var clamped := clampi(index, 0, maxi(max_crates - 1, 0))
+    var layer := clamped / per_layer
+    var within := clamped % per_layer
+    var row := within / GRID_COLUMNS
+    var column := within % GRID_COLUMNS
+    var spacing := GRID_SPACING
+    if rect.size.x > 0.0:
+        spacing.x = minf(spacing.x, (rect.size.x - crate_width * 0.9) / float(GRID_COLUMNS - 1))
+        spacing.y = minf(spacing.y, (rect.size.y - 0.6) / float(GRID_ROWS))
+    return Vector3(
+        (float(column) - (GRID_COLUMNS - 1) * 0.5) * spacing.x,
+        float(layer) * crate_width * 0.54,
+        (float(row) - (GRID_ROWS - 1) * 0.5) * spacing.y + float(layer) * 0.03
+    )
+
 func _count_label_local() -> Vector3:
     var art := ItemArt.full_texture(item_id)
     var crate_height := crate_width * float(art.get_height()) / float(art.get_width())
     var stretch := 1.0 / cos(deg_to_rad(VIEW_PITCH_DEGREES))
-    return _slot_local(VISUAL_MAX - 1) + Vector3(0.0, crate_height * stretch + 0.35, 0.2)
+    return _slot_local(get_visual_max() - 1) + Vector3(0.0, crate_height * stretch + 0.35, 0.2)
 
 func _launch(index: int, from: Vector3, to: Vector3, delay: float, kind: String, follow: Node3D = null) -> void:
     if index >= 0:
-        index = CrateStack.visual_index(index, VISUAL_MAX)
+        index = CrateStack.visual_index(index, get_visual_max())
         _in_flight[index] = int(_in_flight.get(index, 0)) + 1
     var flyer := Node3D.new()
     flyer.name = "FlyingCrate_%s_%d" % [kind, jump_log.size()]
@@ -225,7 +266,7 @@ func _launch(index: int, from: Vector3, to: Vector3, delay: float, kind: String,
     flyer.set_meta("grow", 1.0 if kind == "pickup" else 0.7)
     var sprite := _make_crate_sprite(ItemArt.full_texture(item_id))
     sprite.name = "CrateSprite"
-    sprite.render_priority = VISUAL_MAX + 1
+    sprite.render_priority = get_visual_max() + 1
     flyer.add_child(sprite)
     _flyers.append(flyer)
     jump_log.append({"index": index, "from": from, "to": to, "kind": kind})
@@ -242,7 +283,8 @@ func _move_flyer(t: float, flyer, from: Vector3, to: Vector3, follow, kind: Stri
         return
     var target: Vector3 = follow.global_position if follow != null and is_instance_valid(follow) else to
     flyer.global_position = from.lerp(target, t) + Vector3(0.0, 4.0 * t * (1.0 - t) * JUMP_HEIGHT, 0.0)
-    flyer.set_meta("grow", lerpf(1.0, 0.6, t) if kind == "pickup" else lerpf(0.7, 1.0, t))
+    # Recolhida: chega à mochila no tamanho das caixas do fazendeiro/balcão.
+    flyer.set_meta("grow", lerpf(1.0, SalesCounter.CRATE_WIDTH / crate_width, t) if kind == "pickup" else lerpf(0.7, 1.0, t))
 
 func _land(index: int, flyer) -> void:
     _flyers.erase(flyer)

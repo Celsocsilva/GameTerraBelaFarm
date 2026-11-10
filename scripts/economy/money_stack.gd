@@ -14,6 +14,10 @@ signal balance_changed(balance: int, delta: int)
 signal slot_collected(slot: int, amount: int)
 
 const MONEY_TEXTURE := preload("res://assets/sales/money_bundle.png")
+## Tampo da base (FV-HUD-002): bandeja de madeira com moldura, tábuas e os 15
+## encaixes com cifrão gravado. Gerado por tools/art/gen_money_stack_base.py
+## com as mesmas medidas desta classe (CELL_SIZE e BASE_MARGIN).
+const BASE_TEXTURE := preload("res://assets/sales/money_stack_base.png")
 const COLUMNS := 3
 const ROWS := 5
 const SLOTS := COLUMNS * ROWS
@@ -33,8 +37,8 @@ const CELL_SIZE := Vector2(BUNDLE_WIDTH, BUNDLE_WIDTH * ART_ASPECT * VIEW_STRETC
 ## (~17% da altura do PNG), para a pilha parecer contínua.
 const LAYER_STEP := 0.08 * MONEY_SCALE
 ## Bloco de madeira: espessura, raio dos cantos e borda fina além das pilhas.
-const BASE_HEIGHT := 0.08
-const BASE_MARGIN := 0.1
+const BASE_HEIGHT := 0.14
+const BASE_MARGIN := 0.12
 const BASE_RADIUS := 0.16
 ## Folga para "tocar" uma pilha (raio do corpo do fazendeiro).
 const TOUCH_REACH := 0.45
@@ -53,13 +57,26 @@ func _ready() -> void:
     _counts.fill(0)
     for slot in SLOTS:
         _bundles.append([])
-    # Bloco fino de madeira clara com cantos arredondados: corpo um pouco mais
-    # escuro (borda) e tampo claro levemente recuado, imitando um chanfro.
-    var wood_edge := _material(Color(0.60, 0.40, 0.22))
-    var wood_top := _material(Color(0.78, 0.57, 0.35))
+    # Bandeja de madeira: laterais escuras (sombra fixa, sem lavar com a luz) e
+    # tampo com a arte da bandeja. Unshaded como os demais sprites do cenário.
+    var wood_side := _material(Color(0.36, 0.20, 0.09))
     var base_size := get_base_size()
-    _add_rounded_slab("WoodBase", Vector2(base_size.x, base_size.z), BASE_RADIUS, 0.0, BASE_HEIGHT - 0.015, wood_edge)
-    _add_rounded_slab("WoodBaseTop", Vector2(base_size.x - 0.06, base_size.z - 0.06), BASE_RADIUS - 0.03, BASE_HEIGHT - 0.015, 0.015, wood_top)
+    _add_rounded_slab("WoodBase", Vector2(base_size.x, base_size.z), BASE_RADIUS, 0.0, BASE_HEIGHT - 0.01, wood_side)
+    var top := MeshInstance3D.new()
+    top.name = "WoodBaseTop"
+    var top_mesh := PlaneMesh.new()
+    top_mesh.size = Vector2(base_size.x, base_size.z)
+    top.mesh = top_mesh
+    var top_material := StandardMaterial3D.new()
+    top_material.albedo_texture = BASE_TEXTURE
+    top_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR
+    top_material.alpha_scissor_threshold = 0.5
+    top_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    top_material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+    top.material_override = top_material
+    top.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+    top.position = Vector3(0.0, BASE_HEIGHT, 0.0)
+    add_child(top)
     _bundle_mesh = QuadMesh.new()
     _bundle_mesh.size = CELL_SIZE
     _bundle_material = StandardMaterial3D.new()
@@ -240,5 +257,5 @@ func _add_box(label: String, size: Vector3, offset: Vector3, material: Material)
 func _material(color: Color) -> StandardMaterial3D:
     var material := StandardMaterial3D.new()
     material.albedo_color = color
-    material.roughness = 0.9
+    material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
     return material

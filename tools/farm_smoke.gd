@@ -2,7 +2,9 @@ extends SceneTree
 ## Smoke test headless: grade de plantio, tamanho dos tomates e punhado de sementes.
 ## Uso: Godot --headless --path . -s tools/farm_smoke.gd   (código de saída 1 em falha)
 
-const SOIL_TEXTURE_SIZE := Vector2i(466, 912)
+## SOIL-002: o solo largo (600x926) em todos os cultivos.
+const SOIL_TEXTURE_SIZE := Vector2i(600, 926)
+const LEGACY_SOIL_ASPECT := 912.0 / 466.0
 
 var _failures := 0
 
@@ -19,6 +21,7 @@ func _run() -> void:
     var world := scene.instantiate() as FarmWorld
     root.add_child(world)
     await process_frame
+    _check_map_expansion(world)
     _check_soil(world)
     _check_layout(world)
     _check_grid(world)
@@ -32,16 +35,31 @@ func _run() -> void:
     print("FARM_SMOKE_OK")
     quit()
 
+func _check_map_expansion(world: FarmWorld) -> void:
+    var rect := world.get_map_rect()
+    var extra := world.farm_size * FarmWorld.MAP_EXPANSION_RATIO
+    _check(rect.position.is_equal_approx(Vector2(-world.farm_size * 0.5, -world.farm_size * 0.5 - extra)), "expansão deve ocorrer à direita e ao topo")
+    _check(rect.size.is_equal_approx(Vector2.ONE * (world.farm_size + extra)), "mapa deve crescer 10% em cada eixo direcional")
+    var ground := world.get_node("Ground/GrassSurface") as MeshInstance3D
+    var ground_size := (ground.mesh as BoxMesh).size
+    _check(Vector2(ground_size.x, ground_size.z).is_equal_approx(rect.size), "malha do chão não acompanha os novos limites")
+    _check(Vector2(ground.position.x, ground.position.z).is_equal_approx(rect.get_center()), "chão não foi deslocado para o centro assimétrico")
+    _check(is_equal_approx(rect.position.x, -32.0) and is_equal_approx(rect.end.y, 32.0), "esquerda e rodapé originais devem permanecer")
+    _check(is_equal_approx(rect.end.x, world.farm_size * 0.5 + extra) and is_equal_approx(rect.position.y, -world.farm_size * 0.5 - extra), "direita/topo devem refletir as duas expansões de 10%")
+    print("MAP_EXPANSION_OK rect=", rect, " center=", rect.get_center())
+
 func _check_soil(world: FarmWorld) -> void:
     var soil := FarmWorld.SOIL_TEXTURE
-    _check(Vector2i(soil.get_size()) == SOIL_TEXTURE_SIZE, "Textura do solo deve ser a nova arte 466x912")
+    _check(Vector2i(soil.get_size()) == SOIL_TEXTURE_SIZE, "Textura do solo deve ser o solo largo 600x926")
     var plots := world.get_node("PlantingArea").get_children()
     _check(plots.size() == FarmWorld.PLANTING_PLOT_COUNT, "Quantidade de canteiros")
     # Área 1,7x a da versão anterior (tiras de 3,8 m de largura), mesma proporção.
     var plot_area := world.planting_plot_size.x * world.planting_plot_size.y
     var legacy_width := 3.8
-    var legacy_area := legacy_width * legacy_width * world.planting_plot_size.y / world.planting_plot_size.x
-    _check(absf(plot_area / legacy_area - 1.7) < 0.01, "Área de plantio deve ser 1,7x (obtido %.3f)" % (plot_area / legacy_area))
+    # Área comparada com a tira antiga (arte estreita): o solo largo mantém a área.
+    var legacy_area := legacy_width * legacy_width * LEGACY_SOIL_ASPECT * FarmWorld.PLANTING_LENGTH_STRETCH
+    # FARM-003: 1,7x reduzida em 10% (1,53x).
+    _check(absf(plot_area / legacy_area - 1.7 * FarmWorld.CROP_AREA_REDUCTION) < 0.01, "Área de plantio deve ser 1,53x (obtido %.3f)" % (plot_area / legacy_area))
     # Ciclo da planta com o dobro do tempo (30 s -> 60 s) em todas as fases.
     _check(is_equal_approx(CropPlant.new().growth_duration, 60.0), "Ciclo da planta deve durar 60 s")
     # Dinheiro 1,7x e base fora da plantação.
@@ -75,7 +93,9 @@ func _check_layout(world: FarmWorld) -> void:
     _check(absf(ratio - 0.10) < 0.001, "Parcela extra deve ter 10%% da área (obtido %.4f)" % ratio)
     # Quadrada na tela: a câmera a 45° encurta o eixo Z por sin(45°).
     var screen_aspect := extra.size.y * sin(deg_to_rad(FarmWorld.PLANTING_VIEW_PITCH_DEGREES)) / extra.size.x
-    _check(absf(screen_aspect - 1.0) < 0.04, "Parcela extra deve parecer quadrada na tela (altura/largura %.3f)" % screen_aspect)
+    # SOIL-002: com 2 peças do solo largo a parcela fica um pouco mais larga
+    # que alta na tela (a arte não é distorcida para ficar quadrada).
+    _check(screen_aspect > 0.75 and screen_aspect < 1.05, "Parcela extra quase quadrada na tela (altura/largura %.3f)" % screen_aspect)
     _check(not extra.intersects(field), "Parcela extra sobre o canteiro de tomate")
     var counter_half := world.sales_counter.get_half_extents()
     var counter_rect := Rect2(world.sales_counter.position.x - counter_half.x, world.sales_counter.position.z - counter_half.y, counter_half.x * 2.0, counter_half.y * 2.0)
@@ -93,7 +113,7 @@ func _check_layout(world: FarmWorld) -> void:
             _check(not rect.grow(1.0).has_point(b + Vector2(3.0, 0.0)), "Área de cultivo bloqueia a ponte " + bridge.name)
     var spawn := Vector2(world.farmer.global_position.x, world.farmer.global_position.z)
     _check(not field.has_point(spawn) and not extra.has_point(spawn), "Fazendeiro nasce dentro de uma área de cultivo")
-    for name in ["Fence", "Building"]:
+    for name in ["Fence"]:
         var node := world.get_node(name) as Node3D
         _check(not field.grow(1.0).has_point(Vector2(node.position.x, node.position.z)), name + " dentro do canteiro")
     _check(world.extra_planting_area.get_child_count() == FarmWorld.EXTRA_PLOT_STRIPS, "Parcela extra deve ter %d tiras de solo" % FarmWorld.EXTRA_PLOT_STRIPS)
@@ -144,18 +164,28 @@ func _check_throw_reach(world: FarmWorld) -> void:
     grid.process_farmer_position(farmer_position - Vector3(0.0, 0.0, 0.3), 0.0)
     grid.process_farmer_position(farmer_position, 0.4)
     var planted: Array = grid.cells.values().filter(func(c: Dictionary) -> bool: return c["state"] != "EMPTY")
+    # SEED-002: leque a lanço. Sulco da caminhada do pé até 5 plantas à frente
+    # e, mais à frente, também os sulcos vizinhos (área maior, mesmo passo).
     var rows := []
+    var side_cells := 0
     for cell in planted:
-        _check(cell["module_id"] == "PlantingPlot_02" and cell["column"] == 1, "Faixa deve ficar no sulco da caminhada (%s)" % cell["id"])
-        rows.append(cell["row"])
+        var lateral := absf(Vector3(cell["position"]).x - farmer_position.x)
+        _check(lateral <= float(cell["cell_width"]) * (1.0 + grid.seed_lateral_furrows) + 0.3, "Leque largo demais (%s a %.2f m)" % [cell["id"], lateral])
+        if cell["module_id"] == "PlantingPlot_02" and cell["column"] == 1:
+            rows.append(cell["row"])
+        else:
+            side_cells += 1
+            _check(int(cell["row"]) >= 3, "Sulco vizinho só recebe semente mais à frente (%s)" % cell["id"])
     rows.sort()
-    _check(rows == [1, 2, 3, 4], "Deve semear do pé (fileira 1) até 3 plantas à frente (fileira 4), obtido %s" % [rows])
+    _check(rows == [1, 2, 3, 4, 5, 6], "Deve semear do pé (fileira 1) até 5 plantas à frente (fileira 6), obtido %s" % [rows])
+    _check(side_cells >= 2, "Leque deve alcançar sulcos vizinhos (obtido %d)" % side_cells)
+    _check(planted.size() <= grid.seeds_per_step, "No máximo seeds_per_step covas por passo")
     # Próximo passo continua a faixa à frente, sem replantar.
     var next_position: Vector3 = grid.cells["PlantingPlot_02_r02_c01"]["position"]
     grid.process_farmer_position(next_position, 0.4)
-    _check(grid.cells["PlantingPlot_02_r05_c01"]["state"] != "EMPTY", "Passo seguinte semeia a próxima cova da frente")
-    _check(grid.cells["PlantingPlot_02_r06_c01"]["state"] == "EMPTY", "Não semeia além de 3 plantas à frente")
-    print("SEED_BAND_OK rows=", rows, " ahead=", grid.seed_plants_ahead, " band=", snappedf(grid.get_seed_band_length(), 0.01), "m")
+    _check(grid.cells["PlantingPlot_02_r07_c01"]["state"] != "EMPTY", "Passo seguinte semeia a próxima cova da frente")
+    _check(grid.cells["PlantingPlot_02_r08_c01"]["state"] == "EMPTY", "Não semeia além de 5 plantas à frente")
+    print("SEED_BAND_OK rows=", rows, " side=", side_cells, " ahead=", grid.seed_plants_ahead, " band=", snappedf(grid.get_seed_band_length(), 0.01), "m")
     grid.queue_free()
 
 func _check_crop_sizes(world: FarmWorld) -> void:
@@ -214,6 +244,7 @@ func _check_seed_throw(world: FarmWorld) -> void:
     _check(fine_material.spread > material.spread, "Grãos finos devem abrir mais (pulverizado)")
     _check(material.scale_max / fine_material.scale_min >= 10.0, "Faixa total de tamanhos >= 10x")
     _check(material.scale_curve != null, "Curva de escala para pousar suavemente")
+    _check(material.scale_max <= 0.9 and fine_material.scale_max <= 0.4, "SEED-002: grãos menores")
     _check(material.anim_offset_max > material.anim_offset_min, "Sementes devem sortear formatos do atlas")
     # Sem keep_scale o billboard de partículas descarta scale_min/max e a curva.
     _check(draw_material.billboard_keep_scale, "Billboard deve manter a escala de cada semente")

@@ -129,14 +129,19 @@ func _run() -> void:
     var base_near_x := money.global_position.x - MoneyStack.COLUMNS * MoneyStack.CELL_SIZE.x * 0.5 - MoneyStack.BASE_MARGIN
     if base_far_z >= counter.global_position.z or base_near_x <= counter.global_position.x + half.x:
         return _fail("base de dinheiro fora do lado do fazendeiro")
-    # Bloco fino de madeira clara, cantos arredondados, sob toda a grade 3 x 5.
+    # FV-HUD-002: bandeja de madeira de cantos arredondados (laterais escuras +
+    # tampo com a arte money_stack_base.png) sob toda a grade 3 x 5.
     var corners := money.get_children().filter(func(n): return n is MeshInstance3D and (n as MeshInstance3D).mesh is CylinderMesh)
+    var tray_top := money.get_node_or_null("WoodBaseTop") as MeshInstance3D
+    if tray_top == null or (tray_top.material_override as StandardMaterial3D).albedo_texture != MoneyStack.BASE_TEXTURE:
+        return _fail("base de dinheiro sem a arte da bandeja")
     var base_size := MoneyStack.get_base_size()
-    if corners.size() != 8 or base_size.y > 0.1 or base_size.x < MoneyStack.COLUMNS * MoneyStack.CELL_SIZE.x or base_size.z < MoneyStack.ROWS * MoneyStack.CELL_SIZE.y:
+    if corners.size() != 4 or base_size.y > 0.15 or base_size.x < MoneyStack.COLUMNS * MoneyStack.CELL_SIZE.x or base_size.z < MoneyStack.ROWS * MoneyStack.CELL_SIZE.y:
         return _fail("base de madeira: %d cantos, tamanho %s" % [corners.size(), base_size])
-    var top := money.get_node("WoodBaseTop_X") as MeshInstance3D
-    var wood := (top.material_override as StandardMaterial3D).albedo_color
-    if not (wood.r > wood.g and wood.g > wood.b and wood.v > 0.7):
+    # Cor média da arte do tampo: madeira (R > G > B), não amarelo chapado.
+    var tray := MoneyStack.BASE_TEXTURE.get_image()
+    var wood := tray.get_pixel(tray.get_width() / 2, tray.get_height() / 2)
+    if not (wood.r > wood.g and wood.g > wood.b and wood.v > 0.4):
         return _fail("cor da madeira %s" % wood)
     # Sprite novo: cantos transparentes (fundo xadrez removido), centro opaco.
     var art := MoneyStack.MONEY_TEXTURE.get_image()

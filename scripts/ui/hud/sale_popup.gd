@@ -27,7 +27,18 @@ func _ready() -> void:
 func setup(money: int, crates: int) -> void:
 	amount_label.text = "+" + UiStyle.format_int(money)
 	UiStyle.fit_font(amount_label, 58)
-	detail_label.text = "%d %s" % [crates, "caixa" if crates == 1 else "caixas"]
+	_crates = crates
+	detail_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+	_refresh_detail()
+
+var _crates := 0
+
+func _refresh_detail() -> void:
+	detail_label.text = tr("SALE_CRATES_ONE" if _crates == 1 else "SALE_CRATES_MANY") % _crates
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_TRANSLATION_CHANGED and is_node_ready() and detail_label.text != "":
+		_refresh_detail()
 
 func get_text() -> String:
 	return "%s %s" % [amount_label.text, detail_label.text]

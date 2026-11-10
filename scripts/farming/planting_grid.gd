@@ -12,10 +12,15 @@ const STATE_HARVESTING := "HARVESTING"
 const STATE_HARVESTED := "HARVESTED"
 
 @export var planting_radius: float = 0.95
-## Faixa de semeadura: do pé do fazendeiro até N plantas à frente, no mesmo sulco.
-@export_range(1, 5, 1) var seed_plants_ahead: int = 3
-## Máximo de covas semeadas por passo (a do pé + as da frente).
-@export_range(1, 6, 1) var seeds_per_step: int = 4
+## Faixa de semeadura: do pé do fazendeiro até N plantas à frente.
+## SEED-002: alcance maior (era 3) para a semeadura a lanço ir mais longe.
+@export_range(1, 8, 1) var seed_plants_ahead: int = 5
+## SEED-002: a faixa abre em leque à frente e alcança até N sulcos vizinhos de
+## cada lado (perto do pé fica só o sulco da caminhada): um mesmo passo do
+## fazendeiro espalha semente numa área maior, como semeadura a lanço.
+@export_range(0, 3, 1) var seed_lateral_furrows: int = 1
+## Máximo de covas semeadas por passo (era 4).
+@export_range(1, 16, 1) var seeds_per_step: int = 12
 @export var columns: int = 3
 ## 9 fileiras: mantém ~1,5 m entre covas na tira 1,7x maior.
 @export var rows_per_module: int = 9
@@ -23,6 +28,17 @@ const STATE_HARVESTED := "HARVESTED"
 @export var test_mode: bool = true
 ## CROP-CORN-001: cultura das covas desta grade (cada cultura tem a sua grade).
 @export var crop_id: String = "tomato"
+## FARM-003: enfileiramento orgânico. Cada sulco ondula de leve ao longo das
+## fileiras (fração da largura da cova) e cada cova ganha um desvio fixo pequeno
+## (X e Z, fração da cova) e um tamanho entre 1 - size_jitter e 1 + size_jitter.
+## O desvio máximo fica bem dentro da cova: a grade jogável (ids, linhas,
+## colunas, semeadura e colheita) não muda. 0 desliga.
+## ROWS-002 (09/11): pedido do Celso — fileiras ainda mais orgânicas em todas
+## as culturas (eram sway 0,09, jitter 0,06/0,12, tamanho ±7%). A onda do
+## sulco agora mistura duas frequências (curva irregular, não senoide pura).
+@export var organic_sway: float = 0.15
+@export var organic_jitter: Vector2 = Vector2(0.09, 0.17)
+@export var size_jitter: float = 0.10
 
 var cells: Dictionary = {}
 var _cell_spacing := 1.0
@@ -34,7 +50,8 @@ var _plant_accumulator := 0.0
 var _facing := Vector3(0.0, 0.0, 1.0)
 
 func configure(modules: Array[Area3D]) -> void:
-    for module in modules:
+    for module_index in modules.size():
+        var module := modules[module_index]
         var shape := (module.get_node("CollisionShape3D") as CollisionShape3D).shape as BoxShape3D
         var module_width := shape.size.x
         var module_length := shape.size.z
@@ -46,10 +63,11 @@ func configure(modules: Array[Area3D]) -> void:
                 var cell_id := "%s_r%02d_c%02d" % [module.name, row, column]
                 if cells.has(cell_id):
                     continue
+                var organic := get_organic_offset(module_index, row, column)
                 var local_offset := Vector3(
-                    (column + 0.5) * cell_width - module_width * 0.5,
+                    (column + 0.5 + organic.x) * cell_width - module_width * 0.5,
                     0.12,
-                    (row + 0.5) * cell_length - module_length * 0.5
+                    (row + 0.5 + organic.y) * cell_length - module_length * 0.5
                 )
                 cells[cell_id] = {
                     "id": cell_id,
@@ -58,6 +76,7 @@ func configure(modules: Array[Area3D]) -> void:
                     "column": column,
                     "crop_id": crop_id,
                     "cell_width": cell_width,
+                    "size_factor": 1.0 + (_hash(module_index, row, column, 3.3) * 2.0 - 1.0) * size_jitter,
                     "cell_length": cell_length,
                     "position": module.to_global(local_offset),
                     "state": "EMPTY",
@@ -75,6 +94,19 @@ func configure(modules: Array[Area3D]) -> void:
                 _cell_spacing = minf(_cell_spacing, distance)
     if _cell_spacing == INF:
         _cell_spacing = 1.0
+
+## FARM-003: desvio orgânico (em frações da cova) de uma cova: onda suave do
+## sulco ao longo das fileiras + desvio fixo por cova. |x| <= sway + jitter.x.
+func get_organic_offset(module_index: int, row: int, column: int) -> Vector2:
+    var phase := float(module_index) * 2.1 + float(column) * 1.37
+    var sway := (sin(float(row) * 0.85 + phase) * 0.7 + sin(float(row) * 1.9 + phase * 2.3) * 0.3) * organic_sway
+    var jx := (_hash(module_index, row, column, 1.1) * 2.0 - 1.0) * organic_jitter.x
+    var jz := (_hash(module_index, row, column, 2.2) * 2.0 - 1.0) * organic_jitter.y
+    return Vector2(sway + jx, jz)
+
+## Valor fixo em [0, 1) por cova (mesmo canteiro a cada carga, sem sorteio).
+static func _hash(module_index: int, row: int, column: int, salt: float) -> float:
+    return fposmod(sin(float(module_index) * 91.7 + float(row) * 12.9898 + float(column) * 78.233 + salt * 37.719) * 43758.5453, 1.0)
 
 func process_farmer_position(world_position: Vector3, delta: float) -> void:
     if not _has_previous_position:
@@ -96,22 +128,28 @@ func process_farmer_position(world_position: Vector3, delta: float) -> void:
 func get_seed_band_length() -> float:
     return (float(seed_plants_ahead) + 0.5) * _row_step
 
-## Covas vazias do pé do fazendeiro até seed_plants_ahead plantas à frente, no
-## sulco mais próximo da linha de caminhada, da mais próxima para a mais distante.
+## Covas vazias do pé do fazendeiro até seed_plants_ahead plantas à frente,
+## num leque (SEED-002): o sulco da caminhada inteiro e, a partir de ~1/3 da
+## faixa, também os sulcos vizinhos. Ordem: da mais próxima para a mais distante.
 func get_seed_band_cells(origin: Vector3, facing: Vector3) -> Array[Dictionary]:
     var forward := Vector2(facing.x, facing.z)
     forward = forward.normalized() if forward.length() > 0.001 else Vector2(0.0, 1.0)
     var band_start := -0.5 * _row_step
     var band_end := get_seed_band_length()
-    var lateral_limit := _cell_spacing * 0.55
     var candidates: Array = []
     for cell in cells.values():
         if cell["state"] != "EMPTY":
             continue
         var offset := Vector2(cell["position"].x - origin.x, cell["position"].z - origin.z)
         var along := offset.dot(forward)
-        if along >= band_start and along <= band_end and absf(offset.cross(forward)) <= lateral_limit:
-            candidates.append([along, cell])
+        if along < band_start or along > band_end:
+            continue
+        # Largura do sulco: a da cova (a cova orgânica pode sair até ~0,2 dela).
+        var furrow := float(cell.get("cell_width", _cell_spacing))
+        var fan := clampf((along - band_end * 0.3) / (band_end * 0.45), 0.0, 1.0)
+        var lateral_limit := furrow * (0.55 + float(seed_lateral_furrows) * fan)
+        if absf(offset.cross(forward)) <= lateral_limit:
+            candidates.append([along + absf(offset.cross(forward)) * 0.35, cell])
     candidates.sort_custom(func(a: Array, b: Array) -> bool: return a[0] < b[0])
     var result: Array[Dictionary] = []
     for entry in candidates.slice(0, seeds_per_step):

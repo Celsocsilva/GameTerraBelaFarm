@@ -52,7 +52,8 @@ const BARRIER_HEIGHT := 0.7
 ## vendido no balcão. O milho ocupa a vaga da esquerda reservada a ele em
 ## CrateStack; a madeira passou para a vaga da direita (da abóbora, que ainda
 ## não é vendida).
-const EXTRA_SLOT_X := {&"corn": -STACK_SPACING, &"wood": STACK_SPACING}
+## Quatro vagas horizontais: milho, tomate, abóbora e madeira.
+const ITEM_SLOT_X := {&"corn": -4.0, &"tomato": -1.35, &"pumpkin": 1.35, &"wood": 4.0}
 ## Arte da banca de feira plana (toalha xadrez vermelha) — FV-STACK-001.
 const STALL_TEXTURE := preload("res://assets/sales/stall_market_gingham.png")
 ## Largura da arte na cena: a mesma do balcão (a colisão não muda).
@@ -73,7 +74,7 @@ const VIEW_PITCH_DEGREES := 45.0
 @export var build_side_barriers: bool = true
 ## FV-WOOD-001: outros itens que o fazendeiro descarrega aqui, cada um na sua
 ## pilha (TomatoPile reaproveitada, com a arte de ItemArt).
-@export var extra_items: Array[StringName] = [&"corn", &"wood"]
+@export var extra_items: Array[StringName] = [&"corn", &"pumpkin", &"wood"]
 
 ## Registro para testes: um item por caixa que pulou {"index", "from", "to"}.
 var jump_log: Array[Dictionary] = []
@@ -122,7 +123,7 @@ func _build_extra_stacks() -> void:
         stack.units_per_crate = units_per_crate
         stack.crate_width = CRATE_WIDTH
         stack.max_crates = 999
-        stack.position = Vector3(float(EXTRA_SLOT_X.get(item, -STACK_SPACING)), get_crate_base_height(), 0.0)
+        stack.position = Vector3(_item_slot_x(item), get_crate_base_height(), 0.0)
         add_child(stack)
         _extra_stacks[item] = stack
 
@@ -369,7 +370,8 @@ func _launch_crate(index: int, from: Vector3, delay: float) -> void:
     flyer.top_level = true
     add_child(flyer)
     flyer.global_position = from
-    flyer.set_meta("grow", 0.75)
+    # FV-POLISH-001: a caixa da mochila já tem o tamanho da do balcão.
+    flyer.set_meta("grow", 1.0)
     var sprite := _make_crate_sprite(CRATE_FULL_TEXTURE)
     sprite.name = "CrateSprite"
     flyer.add_child(sprite)
@@ -389,8 +391,6 @@ func _move_flyer(t: float, flyer: Node3D, from: Vector3, to: Vector3) -> void:
         return
     var arc := 4.0 * t * (1.0 - t) * JUMP_HEIGHT
     flyer.global_position = from.lerp(to, t) + Vector3(0.0, arc, 0.0)
-    # Sai das mãos menor (caixa da mochila) e chega no tamanho da pilha.
-    flyer.set_meta("grow", lerpf(0.75, 1.0, t))
     _orient_sprites()
 
 func _land_crate(index: int, flyer: Node3D) -> void:
@@ -486,10 +486,13 @@ func _slot_local(index: int) -> Vector3:
     # Camadas de cima um pouco à frente (+Z): cobrem a borda da caixa de baixo
     # sem disputar profundidade no mesmo plano.
     return Vector3(
-        CrateStack.slot_x(item_id, STACK_SPACING),
+        _item_slot_x(item_id),
         get_crate_base_height() + layer * CRATE_SPACING.y,
         layer * 0.03
     )
+
+func _item_slot_x(item: StringName) -> float:
+    return float(ITEM_SLOT_X.get(item, 0.0))
 
 ## Contador logo acima da caixa do topo.
 func _count_label_local() -> Vector3:

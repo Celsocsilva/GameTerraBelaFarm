@@ -21,6 +21,8 @@ func _check(condition: bool, message: String) -> void:
         push_error("HARVEST_SMOKE_FAIL: " + message)
 
 func _run() -> void:
+    # FARM-003: textos do HUD vêm do ui.csv; o teste confere em pt_BR.
+    TranslationServer.set_locale("pt_BR")
     _test_inventory_math()
     await _test_backpack_states()
     await _test_grid_spacing()
@@ -103,8 +105,12 @@ func _test_grid_spacing() -> void:
             var b: Vector3 = cells[j]["position"]
             nearest = minf(nearest, Vector2(a.x, a.z).distance_to(Vector2(b.x, b.z)))
     var gap := world.planting_plot_spacing.x - FarmWorld.PLANTING_PLOT_WIDTH * (1.0 - 1.0 / grid.columns)
-    _check(nearest > 0.01 and is_equal_approx(nearest, gap),
-        "Espaçamento real esperado %.3f m, obtido %.3f m" % [gap, nearest])
+    # FARM-003: enfileiramento orgânico desloca cada cova um pouco (no máximo
+    # sway + jitter da largura da cova); o vão mínimo encolhe só esse tanto.
+    var cell_width: float = cells[0]["cell_width"]
+    var slack := 2.0 * (grid.organic_sway + grid.organic_jitter.x) * cell_width
+    _check(nearest > 0.01 and nearest <= gap + 0.001 and nearest >= gap - slack,
+        "Espaçamento real esperado %.3f m (-%.3f orgânico), obtido %.3f m" % [gap, slack, nearest])
     _check(is_equal_approx(grid.get_cell_spacing(), nearest),
         "get_cell_spacing deve medir os centros reais: %.3f m, obtido %.3f m" % [nearest, grid.get_cell_spacing()])
     _check(is_equal_approx(world.harvest_controller.get_harvest_radius(),

@@ -26,6 +26,8 @@ func _advance(world: FarmWorld, delta: float) -> void:
     world.sales_controller.tick(delta)
 
 func _run() -> void:
+    # FARM-003: textos do HUD vêm do ui.csv; o teste confere em pt_BR.
+    TranslationServer.set_locale("pt_BR")
     var world := (load("res://scenes/world/farm_world.tscn") as PackedScene).instantiate() as FarmWorld
     root.add_child(world)
     await process_frame
@@ -42,9 +44,49 @@ func _run() -> void:
         return _fail("FarmHUD ausente")
     if world.get_node_or_null("HUD/VirtualJoystick") == null or world.farmer.joystick_path != NodePath("../HUD/VirtualJoystick"):
         return _fail("joystick fora do HUD")
-    for path in ["Root/PlayerLevelPanel", "Root/MissionPanel", "Root/Counters/MoneyCounter", "Root/Counters/TomatoCounter", "Root/Counters/CrateCounter", "Root/StoreButton", "Root/RewardPopup", "Root/InfoBanner"]:
+    for path in ["Root/PlayerLevelPanel", "Root/MissionPanel", "Root/Counters/WalletBar", "Root/Counters/TomatoCounter", "Root/Counters/CrateCounter", "Root/StoreButton", "Root/SettingsButton", "ModalLayer/ModalRoot/FarmShopModal", "ModalLayer/ModalRoot/FarmSettingsModal", "Root/RewardPopup", "Root/InfoBanner"]:
         if hud.get_node_or_null(path) == null:
             return _fail("componente ausente: " + path)
+
+    # 1b. FV-HUD-002: topo direito só com dinheiro + ouro num bloco preto
+    # translúcido; tomates/caixas ocultos; modais numa camada acima do HUD.
+    if not is_equal_approx(hud.wallet_bar.get_background_color().a, HudWalletBar.BG_ALPHA) or hud.wallet_bar.get_background_color().r != 0.0:
+        return _fail("fundo do bloco de dinheiro: %s" % hud.wallet_bar.get_background_color())
+    if hud.tomato_counter.visible or hud.crate_counter.visible:
+        return _fail("tomates/caixas ainda visíveis no topo")
+    if hud.get_gold_text() != "0":
+        return _fail("ouro inicial: %s" % hud.get_gold_text())
+    wallet.add_gold(1500, &"test")
+    if hud.get_gold_text() != "1.500" or wallet.get_gold() != 1500:
+        return _fail("ouro: %s" % hud.get_gold_text())
+    wallet.set_gold(0)
+    if hud.modal_layer.layer <= hud.layer:
+        return _fail("camada das modais abaixo do HUD")
+    var joystick_node := world.get_node("HUD/VirtualJoystick")
+    if joystick_node.get_parent() == hud.modal_layer or hud.shop_modal.get_parent().get_parent() != hud.modal_layer:
+        return _fail("loja fora da camada de modais")
+    hud.settings_button.pressed.emit()
+    if not hud.settings_modal.is_open() or not hud.is_modal_open():
+        return _fail("engrenagem não abriu as configurações")
+    var locale_before := TranslationServer.get_locale()
+    hud.settings_modal.choose_language("en")
+    if TranslationServer.translate("SETTINGS_TITLE") != "Settings":
+        return _fail("idioma EN: %s" % TranslationServer.translate("SETTINGS_TITLE"))
+    hud.settings_modal.choose_language("es")
+    if TranslationServer.translate("SETTINGS_TITLE") != "Ajustes":
+        return _fail("idioma ES")
+    hud.settings_modal.choose_language("pt_BR")
+    if TranslationServer.translate("SETTINGS_TITLE") != "Configurações":
+        return _fail("idioma PT")
+    hud.settings_modal.toggle_sound()
+    var muted := not FarmSettings.is_sound_enabled()
+    hud.settings_modal.toggle_sound()
+    if not muted or not FarmSettings.is_sound_enabled():
+        return _fail("som liga/desliga")
+    hud.settings_modal.close_settings()
+    TranslationServer.set_locale(locale_before)
+    DirAccess.remove_absolute(ProjectSettings.globalize_path(FarmSettings.PATH))
+    print("HUD_002 wallet_alpha=%.2f gold=ok settings=ok modal_layer=%d" % [HudWalletBar.BG_ALPHA, hud.modal_layer.layer])
 
     # 2. Valores iniciais vindos dos estados existentes.
     if hud.get_money_text() != "0" or hud.get_tomato_text() != "0/56" or hud.get_crate_text() != "0/7":
@@ -225,18 +267,18 @@ func _run() -> void:
     for screen in [Vector2(1280, 720), Vector2(1280, 2275), Vector2(1600, 720)]:
         hud.layout_for(screen)
         var bounds := Rect2(Vector2.ZERO, screen)
-        for control in [hud.level_panel, hud.mission_panel, hud.money_counter, hud.tomato_counter, hud.crate_counter, hud.store_button, hud.info_banner]:
+        for control in [hud.level_panel, hud.mission_panel, hud.wallet_bar, hud.store_button, hud.settings_button, hud.info_banner]:
             var r := (control as Control).get_global_rect()
             if not bounds.encloses(r):
                 return _fail("%s fora da tela %s: %s" % [control.name, screen, r])
         var popup_zone := Rect2(hud.sale_popups.global_position, FarmHUD.SALE_POPUP_SCENE_SIZE * FarmHUD.SALE_POPUP_SCALE * (FarmHUD.PORTRAIT_BOOST if screen.y > screen.x else 1.0) * Vector2(1, 2.1))
         if popup_zone.intersects(hud.info_banner.get_global_rect()) or not bounds.encloses(popup_zone):
             return _fail("avisos de venda sobre a faixa ou fora da tela em %s" % screen)
-        if hud.level_panel.get_global_rect().intersects(hud.money_counter.get_global_rect()) or hud.mission_panel.get_global_rect().intersects(hud.info_banner.get_global_rect()):
+        if hud.level_panel.get_global_rect().intersects(hud.wallet_bar.get_global_rect()) or hud.settings_button.get_global_rect().intersects(hud.store_button.get_global_rect()) or hud.mission_panel.get_global_rect().intersects(hud.info_banner.get_global_rect()):
             return _fail("sobreposição em %s" % screen)
         var joystick_rect := Rect2(Vector2(28, screen.y - 250), joystick.size)
         var center := Rect2(screen * 0.5 - Vector2(220, 100), Vector2(440, 200))
-        for control in [hud.level_panel, hud.mission_panel, hud.money_counter, hud.tomato_counter, hud.crate_counter, hud.store_button, hud.info_banner]:
+        for control in [hud.level_panel, hud.mission_panel, hud.wallet_bar, hud.store_button, hud.settings_button, hud.info_banner]:
             var r := (control as Control).get_global_rect()
             if r.intersects(joystick_rect) or r.intersects(center):
                 return _fail("%s cobre joystick/centro em %s" % [control.name, screen])
@@ -261,7 +303,7 @@ func _qa_v5(world: FarmWorld) -> void:
     # Dinheiro: 0, 1, 999, 1.250 e 9.999.999 sem truncar.
     for pair in [[0, "0"], [1, "1"], [999, "999"], [1250, "1.250"], [9999999, "9.999.999"]]:
         wallet.set_balance(pair[0])
-        var label := hud.money_counter.get_value_label()
+        var label := hud.wallet_bar.get_money_label()
         if hud.get_money_text() != pair[1] or UiStyle.text_width(label) > label.size.x:
             return _fail("dinheiro %s: '%s' largura %.0f/%.0f" % [pair[1], hud.get_money_text(), UiStyle.text_width(label), label.size.x])
         print("QA_MONEY %s font=%d width=%.0f/%.0f" % [pair[1], label.get_theme_font_size("font_size"), UiStyle.text_width(label), label.size.x])
@@ -278,13 +320,13 @@ func _qa_v5(world: FarmWorld) -> void:
     inventory.set_amount(&"tomato", 0)
     # Uma atualização do contador por mudança; nenhuma quando o valor não muda.
     wallet.set_balance(100)
-    var updates := hud.money_counter.update_count
+    var updates := hud.wallet_bar.money_update_count
     wallet.add(5, &"qa")
-    if hud.money_counter.update_count != updates + 1:
-        return _fail("contador atualizou %d vezes" % (hud.money_counter.update_count - updates))
+    if hud.wallet_bar.money_update_count != updates + 1:
+        return _fail("contador atualizou %d vezes" % (hud.wallet_bar.money_update_count - updates))
     wallet.add(0, &"qa")
     hud.refresh()
-    if hud.money_counter.update_count != updates + 1:
+    if hud.wallet_bar.money_update_count != updates + 1:
         return _fail("atualização sem mudança de valor")
     # Abrir o popup não cria dinheiro; coletar várias vezes credita uma vez só.
     var tracker := world.mission_tracker

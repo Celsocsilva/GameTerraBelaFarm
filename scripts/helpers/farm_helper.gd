@@ -320,10 +320,10 @@ func _update_carry_visual() -> void:
     if _carry_visual == null:
         return
     _carry_visual.visible = carried > 0
-    var texture: Texture2D = ItemArt.full_texture(get_item_id()) if carried >= units_per_crate else CRATE_EMPTY_TEXTURE
+    var texture: Texture2D = ItemArt.full_texture(get_item_id()) if carried >= units_per_crate else ItemArt.partial_texture(get_item_id(), carried, units_per_crate)
     if _carry_sprite.texture != texture:
         _carry_sprite.texture = texture
-        _carry_sprite.pixel_size = 0.9 / float(texture.get_width())
+        _carry_sprite.pixel_size = 0.9 * ItemArt.width_scale(get_item_id()) / float(texture.get_width())
 
 func _get_camera() -> Camera3D:
     if _camera == null or not is_instance_valid(_camera):

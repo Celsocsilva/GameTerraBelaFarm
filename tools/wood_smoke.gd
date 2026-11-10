@@ -75,7 +75,7 @@ func _test_placement(world: FarmWorld, grove: EucalyptusGrove) -> void:
     for tree in grove.trees:
         var p := Vector2(tree.position.x, tree.position.y)
         p = Vector2(tree.position.x, tree.position.z)
-        _check(absf(p.x) < world.farm_size * 0.5 - 1.0 and absf(p.y) < world.farm_size * 0.5 - 1.0, "%s fora do terreno" % tree.name)
+        _check(world.get_map_rect().grow(-1.0).has_point(p), "%s fora do terreno" % tree.name)
         _check(not world.river_system.is_point_in_water(tree.position, 0.3), "%s dentro do rio" % tree.name)
         for field in fields:
             _check(not field.has_point(p), "%s dentro de um canteiro" % tree.name)
@@ -129,7 +129,10 @@ func _test_chop_cycle(world: FarmWorld, grove: EucalyptusGrove) -> void:
     var felled := []
     grove.tree_felled.connect(func(t: EucalyptusTree, logs: int) -> void: felled.append(logs))
     # Passar longe não corta.
-    grove.process_farmer_position(tree.global_position + Vector3(0.0, 0.0, -5.0), STEP)
+    # FV-POLISH-001: com os bosques de pinheiros, 5 m ao norte pode ter outra
+    # árvore; "longe" agora é o meio do canteiro de tomate (sem árvores).
+    var far := world.get_planting_area_rect().get_center()
+    grove.process_farmer_position(Vector3(far.x, 0.0, far.y), STEP)
     _check(not grove.is_chopping(), "cortou de longe")
     # FV-WOOD-002: estágios da queda no ritmo do machado.
     var pos := tree.global_position + Vector3(0.6, 0.0, 0.4)
@@ -232,7 +235,7 @@ func _test_counter_and_sale(world: FarmWorld) -> void:
     _check(stack.get_visible_crate_count() == 1, "fardo não aparece no balcão")
     var sprite := stack.get_child(0).get_node("CrateSprite") as Sprite3D
     _check(sprite.texture == ItemArt.LOG_BUNDLE_8, "fardo do balcão sem a arte de 8 toras")
-    _check(absf(stack.position.x - SalesCounter.EXTRA_SLOT_X[WoodConfig.ITEM]) < 0.01, "pilha da madeira fora da vaga")
+    _check(absf(stack.position.x - SalesCounter.ITEM_SLOT_X[WoodConfig.ITEM]) < 0.01, "pilha da madeira fora da vaga")
     # Venda: um cliente compra o fardo pelo preço da madeira.
     var sales := world.sales_controller
     _check(sales.price_for_units(8, WoodConfig.ITEM) == WoodConfig.PRICE_PER_BUNDLE, "preço do fardo")

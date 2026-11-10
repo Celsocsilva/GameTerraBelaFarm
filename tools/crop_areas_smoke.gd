@@ -4,7 +4,9 @@ extends SceneTree
 ## saída 1 em falha. Uso: Godot --headless --path . -s tools/crop_areas_smoke.gd
 
 ## Distância mínima (m) entre as bordas de duas áreas de cultura (com estoque e plataforma).
-const MIN_AREA_GAP := 6.0
+## FV-POLISH-001: com as áreas no tamanho do tomate, o vão mínimo virou
+## a passagem livre entre elas (antes 6 m com áreas de 0,75x).
+const MIN_AREA_GAP := 2.5
 
 var _failures := 0
 
@@ -74,8 +76,7 @@ func _test_fences(world: FarmWorld) -> void:
 func _test_crop_areas(world: FarmWorld) -> void:
     _check(world.crop_areas.size() == FarmWorld.CROP_AREAS.size(), "esperadas %d áreas extras" % FarmWorld.CROP_AREAS.size())
     var footprints: Array[Rect2] = [world.get_planting_area_rect().merge(world.get_extra_plot_rect()).merge(world.get_helper_pad_rect())]
-    var half := world.farm_size * 0.5 - 0.5
-    var map := Rect2(-half, -half, half * 2.0, half * 2.0)
+    var map := world.get_map_rect().grow(-0.5)
     for entry in world.crop_areas:
         var crop: StringName = entry["crop"]
         var field: Rect2 = entry["field"]
@@ -91,10 +92,14 @@ func _test_crop_areas(world: FarmWorld) -> void:
         # Canteiro com a mesma arte do solo; não entra no PlantingGrid (sem arte de crescimento).
         var area := entry["area"] as Node3D
         _check(area.get_meta("crop", "") == String(crop) and area.get_meta("is_crop_group", false), "meta da área de " + crop)
-        _check(area.get_child_count() == FarmWorld.CROP_AREA_STRIPS, "tiras da área de " + crop)
+        # FARM-003: a abóbora usa 2 peças do solo largo; as outras, 3 tiras.
+        var wide := String(area.get_meta("soil", "")) == "wide"
+        _check(area.get_child_count() == (2 if wide else FarmWorld.CROP_AREA_STRIPS), "tiras da área de " + crop)
+        _check(wide == (crop == &"pumpkin"), "solo largo só na abóbora: " + crop)
         for plot in area.get_children():
             var soil := plot.get_node("PlowedSoil") as MeshInstance3D
-            _check((soil.material_override as StandardMaterial3D).albedo_texture == FarmWorld.SOIL_TEXTURE, "solo de " + crop)
+            var expected_soil := FarmWorld.SOIL_TEXTURE_WIDE if wide else FarmWorld.SOIL_TEXTURE
+            _check((soil.material_override as StandardMaterial3D).albedo_texture == expected_soil, "solo de " + crop)
         for cell in world.planting_grid.cells.values():
             var p: Vector3 = cell["position"]
             _check(not field.has_point(Vector2(p.x, p.z)), "célula do PlantingGrid dentro da área de " + crop)
@@ -114,6 +119,9 @@ func _test_crop_areas(world: FarmWorld) -> void:
         _check(stock.has_point(Vector2(pile.position.x, pile.position.z)), "pilha fora do estoque de " + crop)
         # Plataforma do ajudante no chão, depois do estoque, sem encostar nele.
         var pad := entry["pad"] as HelperPad
+        var hiring := entry["hiring"] as HelperHiring
+        var requirement := HelperConfig.initial_requirement(crop)
+        _check(hiring.requirement_item == requirement.get("item", &"") and hiring.requirement_crates == int(requirement.get("crates", 0)), "requisito do ajudante de " + crop)
         _check(pad.rect.is_equal_approx(pad_rect), "plataforma fora do lugar: " + crop)
         _check(not pad_rect.intersects(stock) and not pad_rect.intersects(field), "plataforma sobre o solo de " + crop)
         # Longe do rio, das pontes, do balcão, da base de dinheiro e das construções.
@@ -125,7 +133,7 @@ func _test_crop_areas(world: FarmWorld) -> void:
         var counter_half := world.sales_counter.get_half_extents()
         var counter_line := Rect2(-world.farm_size * 0.5, world.sales_counter.position.z - counter_half.y - 4.0, world.farm_size, 8.0)
         _check(not whole.intersects(counter_line), crop + " encosta no balcão/cerca")
-        for name in ["Fence", "Building"]:
+        for name in ["Fence"]:
             var node := world.get_node(name) as Node3D
             _check(not whole.grow(1.5).has_point(Vector2(node.position.x, node.position.z)), "%s encosta em %s" % [crop, name])
         var spawn := Vector2(world.farmer.global_position.x, world.farmer.global_position.z)

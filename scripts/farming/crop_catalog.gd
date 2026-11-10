@@ -7,6 +7,7 @@ class_name CropCatalog
 
 const TOMATO := &"tomato"
 const CORN := &"corn"
+const PUMPKIN := &"pumpkin"
 
 const CROPS := {
     &"tomato": {
@@ -31,13 +32,33 @@ const CROPS := {
             "res://assets/crops/corn/stages/corn_stage_04_mature_two_ears.png",
         ],
         # O milho é mais alto que o tomate e cresce bem mais entre os estágios.
-        "heights": [0.75, 1.25, 1.55, 1.8],
+        # CORN-SIZE-002 (09/11): pedido do Celso — milho 10% maior e, no mesmo
+        # dia, mais 20% (x1,1 x 1,2 = x1,32 na altura e na largura máxima):
+        # era [0.75, 1.25, 1.55, 1.8] e 1.15 da cova.
+        "heights": [0.75 * 1.32, 1.25 * 1.32, 1.55 * 1.32, 1.8 * 1.32],
+        "max_width_fraction": 1.15 * 1.32,
         "fruit": "res://assets/harvest/corn_cob.png",
         "fruit_height": 0.7,
         # Provisório: 4 espigas por pé (duas espigas visíveis no desenho).
         "yield": 4,
         # Provisório: caixa de milho vale 4 (tomate 3, fardo de madeira 6).
         "price_per_crate": 4,
+    },
+    # Broto -> rama florida -> frutos verdes/amarelos -> abóboras maduras.
+    &"pumpkin": {
+        "stages": [
+            "res://assets/crops/pumpkin/stages/pumpkin_stage_01_sprout.png",
+            "res://assets/crops/pumpkin/stages/pumpkin_stage_02_flowering.png",
+            "res://assets/crops/pumpkin/stages/pumpkin_stage_03_green_fruit.png",
+            "res://assets/crops/pumpkin/stages/pumpkin_stage_04_ripe.png",
+        ],
+        # Cultura rasteira larga, deliberadamente maior e mais destacada.
+        "heights": [1.1, 1.55, 1.9, 2.35],
+        "max_width_fraction": 1.55,
+        "fruit": "res://assets/crops/pumpkin/stages/pumpkin_stage_04_ripe.png",
+        "fruit_height": 0.9,
+        "yield": 2,
+        "price_per_crate": 6,
     },
 }
 
@@ -64,3 +85,6 @@ static func fruit_texture(crop: StringName) -> Texture2D:
 
 static func fruit_height(crop: StringName) -> float:
     return float(_data(crop)["fruit_height"])
+
+static func max_width_fraction(crop: StringName) -> float:
+    return float(_data(crop).get("max_width_fraction", 1.15))
