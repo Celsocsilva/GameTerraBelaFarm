@@ -15,23 +15,27 @@ signal landed(target: Vector3)
 @export_range(0.5, 1.0, 0.01) var release_explosiveness: float = 0.86
 
 @export_group("Grãos principais")
-@export_range(4, 24, 1) var seed_amount: int = 7
-@export_range(0.3, 1.6, 0.05) var seed_scale_min: float = 0.65
-@export_range(0.3, 1.6, 0.05) var seed_scale_max: float = 1.45
-@export_range(0.0, 45.0, 1.0) var spread_degrees: float = 14.0
+## SEED-002: grãos menores (eram 0,65–1,45) e um punhado mais aberto.
+@export_range(4, 24, 1) var seed_amount: int = 8
+@export_range(0.2, 1.6, 0.05) var seed_scale_min: float = 0.4
+@export_range(0.2, 1.6, 0.05) var seed_scale_max: float = 0.85
+@export_range(0.0, 45.0, 1.0) var spread_degrees: float = 18.0
 ## Variação de força (0.15 = ±15%), espalha a queda ao redor do alvo.
 @export_range(0.0, 0.5, 0.01) var velocity_variation: float = 0.15
 
 @export_group("Grãos finos")
-@export_range(0, 48, 1) var fine_amount: int = 18
-@export_range(0.05, 1.0, 0.01) var fine_scale_min: float = 0.12
-@export_range(0.1, 1.0, 0.05) var fine_scale_max: float = 0.55
-@export_range(0.0, 60.0, 1.0) var fine_spread_degrees: float = 30.0
+@export_range(0, 48, 1) var fine_amount: int = 20
+@export_range(0.03, 1.0, 0.01) var fine_scale_min: float = 0.07
+@export_range(0.1, 1.0, 0.05) var fine_scale_max: float = 0.35
+@export_range(0.0, 60.0, 1.0) var fine_spread_degrees: float = 36.0
 @export_range(0.0, 0.5, 0.01) var fine_velocity_variation: float = 0.3
 
 @export_group("Grãos no solo")
-@export_range(0, 40, 1) var ground_grain_count: int = 11
-@export_range(0.1, 2.0, 0.05) var ground_scatter_radius: float = 1.05
+@export_range(0, 40, 1) var ground_grain_count: int = 14
+@export_range(0.1, 2.0, 0.05) var ground_scatter_radius: float = 1.25
+## SEED-002: o rastro de grãos no solo é alongado na direção do arremesso
+## (elipse), como a semente lançada a lanço que "escorre" para a frente.
+@export_range(1.0, 3.0, 0.05) var ground_scatter_stretch: float = 1.6
 @export_range(0.2, 3.0, 0.1) var ground_grain_lifetime: float = 1.1
 
 const SEED_ATLAS := preload("res://assets/seeds/tomato_seed_atlas_2x2.png")
@@ -42,12 +46,25 @@ const SEED_QUAD_SIZE := 0.62
 @onready var fine_particles: GPUParticles3D = $FineSeeds
 var _launched := false
 
-func launch(origin: Vector3, target: Vector3) -> void:
+## `delay` (SEED-002) escalona os punhados de um mesmo passo: perto primeiro,
+## longe depois, como um único gesto de semear a lanço.
+var _throw_direction := Vector2(0.0, 1.0)
+
+func launch(origin: Vector3, target: Vector3, delay: float = 0.0) -> void:
 	if _launched:
 		push_warning("SeedThrow.launch chamado duas vezes; instancie uma nova cena por punhado.")
 		return
 	_launched = true
 	global_position = origin
+	var flat := Vector2(target.x - origin.x, target.z - origin.z)
+	if flat.length() > 0.001:
+		_throw_direction = flat.normalized()
+	if delay > 0.0:
+		visible = false
+		await get_tree().create_timer(delay).timeout
+		if not is_inside_tree():
+			return
+		visible = true
 
 	var velocity := solve_launch_velocity(origin, target, gravity, flight_time)
 	_configure_layer(particles, velocity, seed_amount, seed_scale_min, seed_scale_max, spread_degrees, velocity_variation)
@@ -103,8 +120,14 @@ func _scatter_on_ground(center: Vector3) -> void:
 		add_child(grain)
 		var radius := ground_scatter_radius * pow(randf(), 0.8)
 		var angle := randf() * TAU
+		# Elipse alongada na direção do arremesso (SEED-002).
+		var along := cos(angle) * radius * ground_scatter_stretch
+		var across := sin(angle) * radius
+		var dir := _throw_direction
+		var side := Vector2(-dir.y, dir.x)
+		var offset := dir * along + side * across
 		# Pequeno degrau em Y evita z-fighting entre grãos sobrepostos.
-		grain.global_position = Vector3(center.x + cos(angle) * radius, ground_y + 0.004 * i, center.z + sin(angle) * radius)
+		grain.global_position = Vector3(center.x + offset.x, ground_y + 0.004 * i, center.z + offset.y)
 		var tween := grain.create_tween()
 		tween.tween_interval(ground_grain_lifetime * randf_range(0.35, 0.6))
 		tween.tween_property(grain, "modulate:a", 0.0, ground_grain_lifetime * 0.4)

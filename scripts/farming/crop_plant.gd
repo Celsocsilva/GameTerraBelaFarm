@@ -13,7 +13,7 @@ signal ready_for_harvest(cell_id: String)
 @export var cell_width: float = 1.15
 ## Largura máxima visível da planta em relação à célula. Acima de 1.0 a copa
 ## invade levemente a célula vizinha, como em jogos de fazenda cozy.
-@export_range(0.8, 1.6, 0.05) var max_width_fraction: float = 1.15
+@export_range(0.8, 2.0, 0.05) var max_width_fraction: float = 1.15
 ## Altura máxima visível (unidades do mundo) de cada estágio, na ordem de STAGES.
 @export var stage_heights: PackedFloat32Array = PackedFloat32Array([0.8, 1.05, 1.2, 1.35])
 @export_range(0.0, 0.5, 0.01) var stage_pop_duration: float = 0.28
@@ -32,6 +32,27 @@ const ALPHA_THRESHOLD := int(ALPHA_CUTOFF * 255.0)
 
 # Retângulo opaco de cada PNG, calculado uma vez por textura e compartilhado.
 static var _visible_rect_cache: Dictionary = {}
+## FLICK-001: retângulos opacos já calculados (PNG 1254x1254) de todos os
+## estágios. Calcular na hora exige ler a textura de volta da GPU e varrer
+## ~400 mil pixels em GDScript: 25–55 ms no PC (bem mais no celular) na
+## primeira vez que cada estágio aparecia — o "engasgo/piscada" ao carregar
+## a abóbora e o milho. Se a arte mudar de tamanho, o cálculo volta a ser
+## feito na hora (tools/flicker_smoke.gd confere a tabela).
+const PRECOMPUTED_VISIBLE_RECTS := {
+	"res://assets/crops/tomato/stages/tomato_stage_01_sprout.png": Rect2(126, 346, 975, 551),
+	"res://assets/crops/tomato/stages/tomato_stage_02_flowering.png": Rect2(210, 354, 795, 521),
+	"res://assets/crops/tomato/stages/tomato_stage_03_green_2_fruits.png": Rect2(172, 278, 903, 667),
+	"res://assets/crops/tomato/stages/tomato_stage_04_ripe_3_fruits.png": Rect2(122, 282, 985, 755),
+	"res://assets/crops/corn/stages/corn_stage_01_sprout.png": Rect2(284, 492, 681, 543),
+	"res://assets/crops/corn/stages/corn_stage_02_young_five_leaves.png": Rect2(268, 150, 689, 937),
+	"res://assets/crops/corn/stages/corn_stage_03_one_ear.png": Rect2(286, 84, 679, 951),
+	"res://assets/crops/corn/stages/corn_stage_04_mature_two_ears.png": Rect2(246, 26, 761, 1143),
+	"res://assets/crops/pumpkin/stages/pumpkin_stage_01_sprout.png": Rect2(296, 400, 645, 493),
+	"res://assets/crops/pumpkin/stages/pumpkin_stage_02_flowering.png": Rect2(120, 300, 1009, 651),
+	"res://assets/crops/pumpkin/stages/pumpkin_stage_03_green_fruit.png": Rect2(26, 214, 1185, 831),
+	"res://assets/crops/pumpkin/stages/pumpkin_stage_04_ripe.png": Rect2(40, 240, 1169, 813),
+}
+const PRECOMPUTED_TEXTURE_SIZE := Vector2(1254, 1254)
 
 var stage_index := -1
 var planted_at := 0.0
@@ -156,6 +177,9 @@ func _play_stage_pop(from_scale: float) -> void:
 static func _visible_rect(path: String, texture: Texture2D) -> Rect2:
 	if _visible_rect_cache.has(path):
 		return _visible_rect_cache[path]
+	if PRECOMPUTED_VISIBLE_RECTS.has(path) and texture and texture.get_size() == PRECOMPUTED_TEXTURE_SIZE:
+		_visible_rect_cache[path] = PRECOMPUTED_VISIBLE_RECTS[path]
+		return PRECOMPUTED_VISIBLE_RECTS[path]
 	var rect := _compute_visible_rect(texture.get_image())
 	_visible_rect_cache[path] = rect
 	return rect

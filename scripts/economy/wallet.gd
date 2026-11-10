@@ -40,3 +40,38 @@ func set_balance(value: int) -> void:
     _balance = target
     if delta != 0:
         balance_changed.emit(_balance, delta)
+
+# --- Moedas de ouro (FV-HUD-002) -------------------------------------------
+# Moeda premium separada do dinheiro (maços). Ainda não há fonte de ganho
+# definida: começa em 0 e o HUD só exibe. set_gold() serve para save/testes.
+
+signal gold_changed(gold: int, delta: int)
+
+var _gold := 0
+## Registro das moedas de ouro (separado de history, que é só dinheiro).
+var gold_history: Array[Dictionary] = []
+
+func get_gold() -> int:
+    return _gold
+
+func add_gold(amount: int, source: StringName = &"") -> void:
+    if amount <= 0:
+        return
+    _gold += amount
+    gold_history.append({"amount": amount, "source": source})
+    gold_changed.emit(_gold, amount)
+
+func spend_gold(amount: int, reason: StringName = &"") -> bool:
+    if amount <= 0 or amount > _gold:
+        return false
+    _gold -= amount
+    gold_history.append({"amount": -amount, "source": reason})
+    gold_changed.emit(_gold, -amount)
+    return true
+
+func set_gold(value: int) -> void:
+    var target := maxi(value, 0)
+    var delta := target - _gold
+    _gold = target
+    if delta != 0:
+        gold_changed.emit(_gold, delta)

@@ -51,13 +51,13 @@ func _test_counter(world: FarmWorld) -> void:
     _check(counter.get_crate_slot_position(14).is_equal_approx(counter.get_crate_slot_position(SalesCounter.MAX_VISUAL_CRATES - 1)), "caixas extras não pousam no topo")
     var label_y := counter.get_count_label().position.y
     _check(label_y > (counter.get_crate_slot_position(SalesCounter.MAX_VISUAL_CRATES - 1) - counter.global_position).y, "contador abaixo do topo")
-    # Vagas das 3 culturas: dentro da largura do balcão e sem sobrepor.
+    # Vagas dos 3 cultivos + madeira: dentro do balcão e sem sobrepor.
     var xs: Array[float] = []
-    for crop in CrateStack.CROP_ORDER:
-        var x := CrateStack.slot_x(crop, SalesCounter.STACK_SPACING)
-        _check(absf(x) + SalesCounter.CRATE_WIDTH * 0.5 <= half.x, "pilha de %s estoura o balcão" % crop)
+    for item in [&"corn", &"tomato", &"pumpkin", &"wood"]:
+        var x: float = SalesCounter.ITEM_SLOT_X[item]
+        _check(absf(x) + SalesCounter.CRATE_WIDTH * 0.5 <= half.x, "pilha de %s estoura o balcão" % item)
         for other in xs:
-            _check(absf(x - other) >= SalesCounter.CRATE_WIDTH + 0.1, "pilhas sobrepostas (%s)" % crop)
+            _check(absf(x - other) >= SalesCounter.CRATE_WIDTH + 0.1, "pilhas sobrepostas (%s)" % item)
         xs.append(x)
     # Venda: contagem lógica cai e o contador some no limite.
     _check(counter.take_units(11 * units) == 11 * units, "take_units")
@@ -86,24 +86,32 @@ func _test_counter_jumps(world: FarmWorld) -> void:
     _check(counter.get_count_text() == "x7", "contador depois dos pulos '%s'" % counter.get_count_text())
     print("COUNTER_STACK_JUMPS crates=7 visible=%d waited=%.2fs" % [counter.get_visible_crate_count(), waited])
 
+## FV-POLISH-001: a parcela do ajudante empilha em grade 3 colunas x 3
+## fileiras por camada, camadas para cima; 27 caixas = bloco 3 x 3 x 3.
 func _test_pile(world: FarmWorld) -> void:
     var pile := world.tomato_pile
     var units := pile.units_per_crate
     var rect := world.get_extra_plot_rect()
+    _check(pile.grid_layout, "parcela deveria usar a grade 3x3")
     pile.set_stored_total(TomatoPile.MAX_CRATES * units)
     _check(pile.get_crate_count() == TomatoPile.MAX_CRATES, "parcela 27 caixas lógicas")
-    _check(pile.get_visible_crate_count() == TomatoPile.VISUAL_MAX, "parcela: %d visíveis" % pile.get_visible_crate_count())
-    _check(pile.get_count_text() == "x27", "contador da parcela '%s'" % pile.get_count_text())
-    var base := pile.get_slot_local(0)
+    _check(pile.get_visible_crate_count() == TomatoPile.MAX_CRATES, "parcela: %d visíveis" % pile.get_visible_crate_count())
+    _check(pile.get_count_text() == "", "contador da parcela '%s'" % pile.get_count_text())
+    var xs := {}
+    var zs := {}
+    var ys := {}
     for index in TomatoPile.MAX_CRATES:
         var local := pile.get_slot_local(index)
-        _check(is_equal_approx(local.x, base.x), "parcela: caixa %d fora da pilha única" % index)
+        xs[snappedf(local.x, 0.01)] = true
+        zs[snappedf(local.z - floorf(index / 9.0) * 0.03, 0.01)] = true
+        ys[snappedf(local.y, 0.01)] = true
         var p := pile.to_global(local)
         _check(rect.has_point(Vector2(p.x, p.z)), "parcela: caixa %d fora da parcela" % index)
-    for crop in CrateStack.CROP_ORDER:
-        var x := pile.global_position.x + CrateStack.slot_x(crop, minf(TomatoPile.STACK_SPACING, (rect.size.x - TomatoPile.CRATE_WIDTH) * 0.5))
-        _check(x - TomatoPile.CRATE_WIDTH * 0.5 >= rect.position.x - 0.01 and x + TomatoPile.CRATE_WIDTH * 0.5 <= rect.end.x + 0.01, "parcela: pilha de %s fora" % crop)
+        _check(p.x - pile.crate_width * 0.5 >= rect.position.x - 0.2 and p.x + pile.crate_width * 0.5 <= rect.end.x + 0.2, "parcela: caixa %d passa da borda" % index)
+    _check(xs.size() == 3 and zs.size() == 3 and ys.size() == 3, "grade 3x3x3: colunas=%d fileiras=%d camadas=%d" % [xs.size(), zs.size(), ys.size()])
+    # A última caixa (a recolhida primeiro) está na camada de cima.
+    _check(pile.get_slot_local(TomatoPile.MAX_CRATES - 1).y >= pile.get_slot_local(0).y + 0.01, "topo da pilha")
     _check(pile.take_units(23 * units) == 23 * units and pile.get_crate_count() == 4, "parcela depois de recolher")
     _check(pile.get_visible_crate_count() == 4 and pile.get_count_text() == "", "parcela com 4 caixas sem contador")
     pile.set_stored_total(0)
-    print("PILE_STACK visual_max=%d capacity=%d x=%.2f" % [TomatoPile.VISUAL_MAX, TomatoPile.MAX_CRATES, base.x])
+    print("PILE_GRID columns=%d rows=%d layers=%d capacity=%d" % [xs.size(), zs.size(), ys.size(), TomatoPile.MAX_CRATES])

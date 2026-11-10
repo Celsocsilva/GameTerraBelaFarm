@@ -17,12 +17,13 @@ const ICON_TOMATO := preload("res://assets/ui/icons/icon_tomato.png")
 const ICON_CRATE := preload("res://assets/ui/icons/icon_crate_full.png")
 const ICON_CASH := preload("res://assets/currency/cash_bundle_official.png")
 
-## Missões base. Metas: ProgressionConfig.mission_target() (multiplicador de
+## Missões base. "title" é a chave de localization/ui.csv (o HUD traduz).
+## Metas: ProgressionConfig.mission_target() (multiplicador de
 ## dificuldade) vezes (rodada + 1). Prêmios: valor base vezes (rodada + 1).
 const MISSIONS := [
-    {"id": &"harvest_tomatoes", "title": "Colher tomates", "kind": Kind.HARVEST_TOMATOES, "target": ProgressionConfig.BASE_TARGET_HARVEST_TOMATOES, "reward": 10, "xp": 10},
-    {"id": &"sell_crates", "title": "Vender caixas", "kind": Kind.SELL_CRATES, "target": ProgressionConfig.BASE_TARGET_SELL_CRATES, "reward": 15, "xp": 15},
-    {"id": &"collect_money", "title": "Recolher dinheiro", "kind": Kind.COLLECT_MONEY, "target": ProgressionConfig.BASE_TARGET_COLLECT_MONEY, "reward": 20, "xp": 20},
+    {"id": &"harvest_tomatoes", "title": "MISSION_HARVEST_TOMATOES", "kind": Kind.HARVEST_TOMATOES, "target": ProgressionConfig.BASE_TARGET_HARVEST_TOMATOES, "reward": 10, "xp": 10},
+    {"id": &"sell_crates", "title": "MISSION_SELL_CRATES", "kind": Kind.SELL_CRATES, "target": ProgressionConfig.BASE_TARGET_SELL_CRATES, "reward": 15, "xp": 15},
+    {"id": &"collect_money", "title": "MISSION_COLLECT_MONEY", "kind": Kind.COLLECT_MONEY, "target": ProgressionConfig.BASE_TARGET_COLLECT_MONEY, "reward": 20, "xp": 20},
 ]
 
 var index := 0

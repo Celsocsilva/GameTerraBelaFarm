@@ -62,7 +62,11 @@ static func create(scheme_index: int) -> Customer:
     return customer
 
 ## Caixas compradas no balcão, levadas à frente do corpo (frente é -Z local).
-## FV-WOOD-001: com item "wood" o cliente leva fardos de toras (cilindros).
+## FV-POLISH-001: a MESMA arte das caixas do balcão e da mochila (ItemArt:
+## caixa de tomate, caixa de milho ou fardo de toras), em vez das caixas
+## marrons sem textura. Um sprite por caixa, virado para a câmera.
+const CARRY_CRATE_WIDTH := 0.95
+
 func carry_crates(count: int, item: StringName = &"tomato") -> void:
     var old := get_node_or_null("CarriedCrates")
     if old:
@@ -71,53 +75,27 @@ func carry_crates(count: int, item: StringName = &"tomato") -> void:
         return
     var holder := Node3D.new()
     holder.name = "CarriedCrates"
-    holder.position = Vector3(0.0, 0.9, -0.68)
+    holder.position = Vector3(0.0, 0.75, -0.62)
     add_child(holder)
-    var wood := StandardMaterial3D.new()
-    wood.albedo_color = Color(0.58, 0.32, 0.12)
-    var tomato := StandardMaterial3D.new()
-    # CROP-CORN-001: caixa de milho com o topo amarelo das espigas.
-    tomato.albedo_color = Color(0.98, 0.72, 0.12) if item == &"corn" else Color(0.82, 0.10, 0.055)
-    var box := BoxMesh.new()
-    box.size = Vector3(0.62, 0.24, 0.46)
-    var fruit := BoxMesh.new()
-    fruit.size = Vector3(0.52, 0.06, 0.36)
-    if item == &"wood":
-        _carry_log_bundles(holder, count)
-        return
+    var texture := ItemArt.full_texture(item)
+    var width := CARRY_CRATE_WIDTH * ItemArt.width_scale(item)
+    var step := width * float(texture.get_height()) / float(texture.get_width()) * 0.62
     for index in count:
-        var crate := MeshInstance3D.new()
+        var crate := Sprite3D.new()
         crate.name = "Crate_%d" % index
-        crate.mesh = box
-        crate.material_override = wood
-        crate.position.y = index * 0.27
+        crate.texture = texture
+        crate.pixel_size = width / float(texture.get_width())
+        crate.centered = false
+        crate.offset = Vector2(-texture.get_width() * 0.5, 0.0)
+        crate.billboard = BaseMaterial3D.BILLBOARD_FIXED_Y
+        crate.shaded = false
+        crate.double_sided = true
+        crate.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+        crate.alpha_scissor_threshold = 0.5
+        crate.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+        crate.render_priority = index
+        crate.position = Vector3(0.0, index * step, index * 0.02)
         holder.add_child(crate)
-        var top := MeshInstance3D.new()
-        top.mesh = fruit
-        top.material_override = tomato
-        top.position.y = 0.14
-        crate.add_child(top)
-
-## Um fardo = 3 toras deitadas (cilindros de casca marrom, ponta clara).
-func _carry_log_bundles(holder: Node3D, count: int) -> void:
-    var bark := StandardMaterial3D.new()
-    bark.albedo_color = Color(0.55, 0.27, 0.12)
-    var log := CylinderMesh.new()
-    log.top_radius = 0.11
-    log.bottom_radius = 0.11
-    log.height = 0.66
-    log.material = bark
-    for index in count:
-        var bundle := Node3D.new()
-        bundle.name = "Crate_%d" % index
-        bundle.position.y = index * 0.3
-        holder.add_child(bundle)
-        for offset in [Vector2(-0.12, 0.0), Vector2(0.12, 0.0), Vector2(0.0, 0.19)]:
-            var piece := MeshInstance3D.new()
-            piece.mesh = log
-            piece.rotation_degrees.z = 90.0
-            piece.position = Vector3(0.0, offset.y, offset.x)
-            bundle.add_child(piece)
 
 func get_carried_crates() -> int:
     var holder := get_node_or_null("CarriedCrates")

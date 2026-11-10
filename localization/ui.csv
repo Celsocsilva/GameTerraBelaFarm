@@ -8,6 +8,7 @@ HELPER_MAX,Máximo,Máximo,Max
 HELPER_HIRED,Ajudante contratado! Ele empilha os tomates na parcela.,¡Ayudante contratado! Apila los tomates en la parcela.,Helper hired! They stack tomatoes on the plot.
 HELPER_UPGRADED,Ajudante subiu para o grau %d!,¡El ayudante subió al grado %d!,Helper reached grade %d!
 HELPER_NO_MONEY,Faltam %d para o ajudante.,Faltan %d para el ayudante.,You need %d more for the helper.
+HELPER_NO_MATERIAL,Faltam %d caixas/fardos de %s: traga na mochila e pare aqui.,Faltan %d cajas/fardos de %s: tráelos en la mochila y párate aquí.,You need %d more crates/bundles of %s: bring them in your backpack and stand here.
 CROP_TOMATO,Tomate,Tomate,Tomato
 CROP_CORN,Milho,Maíz,Corn
 CROP_PUMPKIN,Abóbora,Calabaza,Pumpkin
@@ -29,6 +30,7 @@ SEASON_AUTUMN,Outono,Otoño,Autumn
 SEASON_WINTER,Inverno,Invierno,Winter
 SEASON_CHANGED,%s chegou: os eucaliptos mudaram,Llegó %s: los eucaliptos cambiaron,%s is here: the eucalyptus trees changed
 HELPER_HIRED_CORN,Ajudante do milho contratado! Ele colhe e empilha o milho na parcela.,¡Ayudante del maíz contratado! Cosecha y apila el maíz en la parcela.,Corn helper hired! They harvest and stack the corn on the plot.
+HELPER_HIRED_PUMPKIN,Ajudante da abóbora contratado! Ele colhe e empilha as abóboras na parcela.,¡Ayudante de la calabaza contratado! Cosecha y apila las calabazas en la parcela.,Pumpkin helper hired! They harvest and stack pumpkins on the plot.
 HARVEST_SELL_FIRST,Mochila ocupada: venda no balcão antes de colher %s,Mochila ocupada: vende en el puesto antes de cosechar %s,Backpack busy: sell at the stall before harvesting %s
 SHOP_TITLE,Loja da Fazenda,Tienda de la Granja,Farm Shop
 SHOP_SUBTITLE,Packs e recursos especiais,Packs y recursos especiales,Packs and special resources
@@ -62,3 +64,17 @@ SHOP_ITEM_CART,Carrinho de transporte,Carro de transporte,Transport cart
 SHOP_ITEM_STARTER,Pacote inicial,Paquete inicial,Starter pack
 SHOP_ITEM_FARMER,Pacote do fazendeiro,Paquete del granjero,Farmer pack
 SHOP_ITEM_SEASON,Pacote de temporada,Paquete de temporada,Season pack
+SETTINGS_TITLE,Configurações,Ajustes,Settings
+SETTINGS_CLOSE,Fechar configurações,Cerrar ajustes,Close settings
+SETTINGS_LANGUAGE,Idioma,Idioma,Language
+SETTINGS_SOUND,Som,Sonido,Sound
+SETTINGS_SOUND_ON,Som ligado,Sonido activado,Sound on
+SETTINGS_SOUND_OFF,Som desligado,Sonido desactivado,Sound off
+MISSION_REWARD,Prêmio,Premio,Reward
+MISSION_HARVEST_TOMATOES,Colher tomates,Cosechar tomates,Harvest tomatoes
+MISSION_SELL_CRATES,Vender caixas,Vender cajas,Sell crates
+MISSION_COLLECT_MONEY,Recolher dinheiro,Recoger dinero,Collect money
+LEVEL_LABEL,Nível %d,Nivel %d,Level %d
+SALE_CRATES_ONE,%d caixa,%d caja,%d crate
+SALE_CRATES_MANY,%d caixas,%d cajas,%d crates
+BACKPACK_FULL,Mochila cheia! Leve as caixas ao Balcão de vendas.,¡Mochila llena! Lleva las cajas al puesto de ventas.,Backpack full! Take the crates to the sales stall.

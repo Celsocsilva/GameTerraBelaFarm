@@ -72,6 +72,9 @@ func _test_config() -> void:
         _check(HelperConfig.UPGRADE_COSTS[i] > HelperConfig.UPGRADE_COSTS[i - 1], "custos crescentes")
         _check(HelperConfig.WALK_SPEEDS[i] >= HelperConfig.WALK_SPEEDS[i - 1], "velocidade não cai")
     _check(HelperConfig.next_cost(HelperConfig.MAX_GRADE) == -1, "sem custo no máximo")
+    _check(HelperConfig.initial_requirement(&"tomato") == {"item": &"wood", "crates": 20}, "tomate exige 20 fardos")
+    _check(HelperConfig.initial_requirement(&"corn") == {"item": &"tomato", "crates": 20}, "milho exige 20 caixas de tomate")
+    _check(HelperConfig.initial_requirement(&"pumpkin") == {"item": &"corn", "crates": 20}, "abóbora exige 20 caixas de milho")
     print("HELPER_CONFIG_OK costs=", HelperConfig.UPGRADE_COSTS)
 
 func _step_pad(seconds: float, on_pad: bool) -> int:
@@ -81,7 +84,7 @@ func _step_pad(seconds: float, on_pad: bool) -> int:
     var paid := 0
     var t := 0.0
     while t < seconds:
-        paid += pad.process_farmer_position(pos, dt)
+        paid += pad.process_farmer_position(pos, dt, world.harvest_inventory)
         t += dt
     return paid
 
@@ -118,12 +121,24 @@ func _test_hiring_on_pad() -> void:
     _check(pad.flight_log.size() == first, "um maço voa por dinheiro")
     var grades: Array[int] = []
     pad.purchased.connect(func(g: int) -> void: grades.append(g))
+    # Sem os 20 fardos, para em 99/100: não gasta o último dinheiro nem libera.
     var t := 0.0
-    while hiring.grade == 0 and t < 5.0:
+    while hiring.paid < 99 and t < 5.0:
         _step_pad(0.02, true)
         t += 0.02
+    _check(hiring.grade == 0 and hiring.paid == 99 and wallet.get_balance() == 51, "material bloqueia em 99/100")
+    _check(world.hud.get_banner_message().contains("20") and world.hud.get_banner_message().contains("Madeira"), "aviso de 20 fardos")
+    # HIRE-FIX-001: estoque do balcão não conta; os fardos vêm da mochila.
+    world.sales_counter.set_item_total(&"wood", 20 * world.harvest_inventory.units_per_crate)
+    _step_pad(HelperPad.START_DELAY + 1.0, true)
+    _check(hiring.grade == 0 and world.sales_counter.get_item_total(&"wood") == 160, "estoque do balcão não é consumido")
+    world.sales_counter.set_item_total(&"wood", 0)
+    await _deliver_wood_in_trips(pad, hiring)
+    _step_pad(0.1, false)
+    _step_pad(HelperPad.START_DELAY + HelperPad.PAY_INTERVAL * 2.0, true)
     _check(grades.size() == 1 and grades[0] == 1 and hiring.grade == 1, "contratado ao completar 100: %s" % [grades])
     _check(wallet.get_balance() + hiring.paid == 50, "custou exatamente 100: saldo %d" % wallet.get_balance())
+    _check(world.harvest_inventory.get_amount(&"wood") == world.harvest_inventory.units_per_crate, "consumiu exatamente 20 fardos (7+7+6, sobra 1 na mochila)")
     await process_frame
     _check(world.farm_helper.visible, "ajudante aparece")
     _check(world.hud.get_banner_message().begins_with("Ajudante contratado"), "aviso de contratação")
@@ -146,6 +161,38 @@ func _test_hiring_on_pad() -> void:
         _check(pad.get_grade_text() == locale[2], "%s grau %s" % [locale[0], pad.get_grade_text()])
         _check(pad.get_cost_text() == locale[3], "%s custo %s" % [locale[0], pad.get_cost_text()])
     print("HELPER_PAD_HIRING_OK first=%d grades=%s spent=3100 locales=pt_BR,es,en" % [first, grades])
+
+## HIRE-FIX-001: 3 viagens de 7/7/7 fardos (mochila com 7 caixas). Cada fardo
+## sai da mochila, voa até o ícone de material e o contador "n/20" sobe.
+func _deliver_wood_in_trips(pad: HelperPad, hiring: HelperHiring) -> void:
+    var inv := world.harvest_inventory
+    var upc := inv.units_per_crate
+    var log_before := pad.material_log.size()
+    _check(pad.get_material_text() == "0/20", "contador inicial do material: " + pad.get_material_text())
+    for trip in 3:
+        inv.set_amount(&"wood", inv.get_capacity())
+        _step_pad(0.2, false)
+        # Um fardo por intervalo, não tudo de uma vez.
+        _step_pad(HelperPad.START_DELAY + HelperPad.MATERIAL_INTERVAL * 1.5, true)
+        var carried_after_one := inv.get_amount(&"wood")
+        _check(carried_after_one == inv.get_capacity() - upc, "viagem %d: um fardo descarregado por vez (mochila %d)" % [trip, carried_after_one])
+        _check(pad.get_material_flying_count() >= 1, "viagem %d: fardo voando até a plataforma" % trip)
+        var last: Dictionary = pad.material_log[pad.material_log.size() - 1]
+        _check(last["item"] == &"wood" and int(last["units"]) == upc, "viagem %d: voo registrado do fardo" % trip)
+        _check((last["from"] as Vector3).y > (last["to"] as Vector3).y + 1.0, "viagem %d: fardo sai das costas e desce na plataforma" % trip)
+        _step_pad(HelperPad.MATERIAL_INTERVAL * 8.0, true)
+        # Deixa os voos pousarem (tweens reais) e confere o contador.
+        await create_timer(HelperPad.MATERIAL_FLIGHT_TIME + 0.3).timeout
+        await process_frame
+        var landed := mini(20, (trip + 1) * 7)
+        _check(pad.get_material_flying_count() == 0, "viagem %d: todos os fardos pousaram" % trip)
+        if trip < 2:
+            _check(pad.get_material_text() == "%d/20" % landed, "viagem %d: contador %s" % [trip, pad.get_material_text()])
+            _check(hiring.material_units == landed * upc and hiring.grade == 0, "viagem %d: material guardado ao sair" % trip)
+            _step_pad(1.0, false)
+            _check(hiring.material_units == landed * upc, "viagem %d: sair da plataforma não devolve fardos" % trip)
+    _check(pad.material_log.size() - log_before == 20, "20 fardos voaram: %d" % (pad.material_log.size() - log_before))
+    print("HELPER_MATERIAL_UNLOAD_OK flights=%d trips=3 left_in_backpack=%d" % [pad.material_log.size() - log_before, inv.get_amount(&"wood") / upc])
 
 func _test_pad_layout() -> void:
     var pad := world.helper_pad
@@ -181,8 +228,10 @@ func _test_harvest_and_stack() -> void:
     pile.finish_jumps()
     _check(pile.is_full(), "pilha encheu: %d/%d" % [pile.get_stored_total(), pile.get_capacity()])
     _check(pile.get_crate_count() == TomatoPile.MAX_CRATES, "27 caixas na contagem lógica")
-    _check(pile.get_visible_crate_count() == TomatoPile.VISUAL_MAX, "pilha única com %d caixas visíveis" % TomatoPile.VISUAL_MAX)
-    _check(pile.get_count_text() == "x27", "contador da pilha: '%s'" % pile.get_count_text())
+    # FV-POLISH-001: grade 3 x 3 por camada; cheia = bloco 3 x 3 x 3, todas visíveis e sem contador.
+    _check(pile.grid_layout, "pilha do ajudante deveria estar em grade 3x3")
+    _check(pile.get_visible_crate_count() == TomatoPile.MAX_CRATES, "pilha 3x3x3 com %d caixas visíveis" % pile.get_visible_crate_count())
+    _check(pile.get_count_text() == "", "contador da pilha: '%s'" % pile.get_count_text())
     _check(helper.state == FarmHelper.WAIT_PILE and helper.carried > 0, "espera com a pilha cheia")
     var rect := world.get_extra_plot_rect()
     for index in TomatoPile.MAX_CRATES:

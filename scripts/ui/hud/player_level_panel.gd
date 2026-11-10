@@ -17,8 +17,16 @@ func _ready() -> void:
     UiStyle.style_label(title_label, 42)
     UiStyle.place(title_label, TITLE_RECT)
     UiStyle.place(xp_bar, XP_RECT)
+    title_label.auto_translate_mode = Node.AUTO_TRANSLATE_MODE_DISABLED
+
+var _level := 1
+
+func _notification(what: int) -> void:
+    if what == NOTIFICATION_TRANSLATION_CHANGED and is_node_ready():
+        title_label.text = tr("LEVEL_LABEL") % _level
 
 func set_level(level: int, xp: int, xp_to_next: int) -> void:
     level_label.text = str(level)
-    title_label.text = "Nível %d" % level
+    _level = level
+    title_label.text = tr("LEVEL_LABEL") % level
     xp_bar.set_progress(xp, xp_to_next)

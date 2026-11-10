@@ -65,6 +65,9 @@ var _flights: Array[Dictionary] = []
 var _season_timer := 0.0
 var _blocked_notified := false
 
+## Variação de tamanho entre árvores (fração da largura padrão).
+const TREE_SIZE_VARIATION := 0.16
+
 ## Planta um eucalipto em cada ponto (XZ do mundo; y é ignorado).
 func setup(points: Array[Vector3], inventory: HarvestInventory, intake: Node3D) -> void:
     _inventory = inventory
@@ -86,6 +89,9 @@ func setup(points: Array[Vector3], inventory: HarvestInventory, intake: Node3D) 
         var tree := TREE_SCRIPT.new() as EucalyptusTree
         tree.name = "Eucalyptus_%02d" % index
         tree.position = Vector3(points[index].x, 0.0, points[index].z)
+        # FV-HUD-002: tamanhos variados (±TREE_SIZE_VARIATION), fixos por posição.
+        var h := fposmod(sin(points[index].x * 91.17 + points[index].z * 47.31) * 43758.5453, 1.0)
+        tree.tree_width *= lerpf(1.0 - TREE_SIZE_VARIATION, 1.0 + TREE_SIZE_VARIATION, h)
         add_child(tree)
         trees.append(tree)
     refresh_season(true)

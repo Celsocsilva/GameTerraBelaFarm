@@ -1,9 +1,8 @@
-[gd_scene load_steps=11 format=3]
+[gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/hud/farm_hud.gd" id="1_script"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/components/PlayerLevelPanel.tscn" id="2_level"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/components/MissionPanel.tscn" id="3_mission"]
-[ext_resource type="PackedScene" path="res://scenes/ui/hud/components/MoneyCounter.tscn" id="4_money"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/components/TomatoCounter.tscn" id="5_tomato"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/components/CrateCounter.tscn" id="6_crate"]
 [ext_resource type="PackedScene" path="res://scenes/ui/hud/components/InfoBanner.tscn" id="7_banner"]
@@ -40,13 +39,6 @@ scale = Vector2(0.46, 0.46)
 [node name="Counters" type="Control" parent="Root"]
 anchors_preset = 0
 mouse_filter = 2
-
-[node name="MoneyCounter" parent="Root/Counters" instance=ExtResource("4_money")]
-offset_left = 647.0
-offset_top = 27.0
-offset_right = 926.0
-offset_bottom = 159.0
-scale = Vector2(0.72, 0.72)
 
 [node name="TomatoCounter" parent="Root/Counters" instance=ExtResource("5_tomato")]
 offset_left = 858.0

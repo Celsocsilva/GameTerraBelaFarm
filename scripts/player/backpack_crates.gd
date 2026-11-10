@@ -9,7 +9,7 @@ class_name BackpackCrates
 ## Hierarquia criada em runtime:
 ##   BackpackCrates (filho do fazendeiro, nas costas)
 ##     BackpackStackRoot   — base da pilha
-##       Crate_0..Crate_6  — top_level, sempre voltadas para a câmera
+##       Crate_0..Crate_6  — posição local estável, sempre voltadas para a câmera
 ##     HarvestIntakeMarker — destino móvel dos frutos sugados (topo da pilha)
 
 const CRATE_EMPTY_TEXTURE := preload("res://assets/harvest/crate_empty.png")
@@ -26,11 +26,20 @@ const PARTIAL_SLOTS := [
 @export var item_id: StringName = &"tomato"
 @export_range(1, 7, 1) var max_crates: int = 7
 @export_range(1, 64, 1) var units_per_crate: int = 8
-## Largura de cada caixa em unidades do mundo.
-@export_range(0.3, 3.0, 0.01) var crate_width: float = 2.0
-## Subida no eixo Y do mundo entre fileiras de caixas.
-@export_range(0.1, 2.0, 0.01) var crate_step: float = 1.2
-@export_range(0.05, 0.8, 0.01) var mini_tomato_size: float = 0.44
+## Largura de cada caixa em unidades do mundo. FV-POLISH-001: a MESMA caixa do
+## balcão de vendas (SalesCounter.CRATE_WIDTH, 1,69 m) — antes era 2,0 m e as
+## caixas pareciam maiores nas costas do que na banca.
+@export_range(0.3, 3.0, 0.01) var crate_width: float = SalesCounter.CRATE_WIDTH
+## Subida no eixo Y do mundo entre fileiras de caixas (a mesma do balcão: a de
+## cima apoiada na borda da de baixo).
+@export_range(0.1, 2.0, 0.01) var crate_step: float = SalesCounter.CRATE_SPACING.y
+@export_range(0.05, 0.8, 0.01) var mini_tomato_size: float = 0.37
+## FLICK-001: cada caixa fica um pouco mais perto da câmera que a anterior
+## (eixo Z local da caixa, que aponta para a câmera). Antes todas ficavam no
+## MESMO plano: onde duas artes se sobrepõem (colunas lado a lado e fileiras
+## de cima/baixo) as duas disputavam a profundidade e a imagem piscava em
+## listras — bem visível na abóbora (arte 25% mais larga) e de leve no milho.
+const DEPTH_STEP := 0.045
 
 var stack_root: Node3D
 var intake_marker: Marker3D
@@ -129,7 +138,22 @@ func _orient_crates() -> void:
         var crate := _crates[index]
         # Duas colunas mantêm as sete imagens ampliadas dentro da câmera.
         # A última caixa de uma fileira incompleta fica centralizada.
-        crate.global_transform = Transform3D(basis, stack_root.global_position + _slot_position(index, visible_count))
+        # A posição permanece local ao fazendeiro; somente a base visual é
+        # orientada no mundo. Reescrever o transform global inteiro enquanto o
+        # pai se movia causava um frame de atraso/flick, sobretudo no milho.
+        # FLICK-001: a coluna da caixa não pode mudar a profundidade com o giro
+        # do fazendeiro (senão, em alguns ângulos, a coluna anula o DEPTH_STEP
+        # e duas caixas voltam ao mesmo plano). A posição local é projetada no
+        # plano virado para a câmera; só o DEPTH_STEP do sprite separa as caixas.
+        var slot := _slot_position(index, visible_count)
+        if _camera != null and stack_root.is_inside_tree():
+            var root_basis := stack_root.global_basis
+            var rel := root_basis * slot
+            var toward := basis.z.normalized()
+            rel -= toward * rel.dot(toward)
+            slot = root_basis.inverse() * rel
+        crate.position = slot
+        crate.global_basis = basis
 
 func _slot_position(index: int, visible_count: int) -> Vector3:
     var row := index / 2
@@ -157,7 +181,7 @@ func _crate_basis() -> Basis:
 func _build_crate(index: int) -> Node3D:
     var crate := Node3D.new()
     crate.name = "Crate_%d" % index
-    crate.top_level = true
+    crate.top_level = false
     crate.visible = false
     crate.set_meta("full", false)
     stack_root.add_child(crate)
@@ -167,9 +191,11 @@ func _build_crate(index: int) -> Node3D:
     sprite.offset = Vector2(-CRATE_EMPTY_TEXTURE.get_width() * 0.5, 0.0)
     # Cada caixa um pouco acima na ordem de desenho que a de baixo.
     sprite.render_priority = index
+    sprite.position.z = DEPTH_STEP * float(index)
     crate.add_child(sprite)
     var minis := Node3D.new()
     minis.name = "PartialFill"
+    minis.position.z = DEPTH_STEP * float(index)
     crate.add_child(minis)
     var crate_pixel := crate_width / float(CRATE_EMPTY_TEXTURE.get_width())
     var size := Vector2(CRATE_EMPTY_TEXTURE.get_size())

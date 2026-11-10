@@ -8,11 +8,22 @@ class_name FarmHUD
 ## Todo número é um Label; os PNGs de assets/ui são só fundos e ícones.
 ## Os componentes são desenhados no tamanho dos PNGs e reduzidos por `scale`.
 ## O layout é refeito a cada mudança de tamanho (paisagem e retrato).
+## FV-HUD-002: o topo direito virou um bloco preto translúcido (HudWalletBar)
+## só com dinheiro e moedas de ouro; tomates/caixas saíram do topo (os nós
+## continuam, ocultos, para a API e os testes). A engrenagem de configurações
+## fica acima da Loja. Loja e configurações abrem numa camada própria
+## (ModalLayer, layer = MODAL_LAYER) acima de TODA a UI, inclusive do joystick.
 
 signal store_pressed()
+signal settings_pressed()
 
 const SALE_POPUP_SCENE := preload("res://scenes/ui/hud/components/SalePopup.tscn")
 const SHOP_MODAL_SCENE := preload("res://scenes/ui/shop/FarmShopModal.tscn")
+## Camada das modais (loja, configurações): acima do HUD (layer 1) e de tudo
+## que é filho dele (joystick).
+const MODAL_LAYER := 50
+const WALLET_SCALE := 0.5
+const SETTINGS_SCALE := 0.5
 const MARGIN := 16.0
 ## Tamanho do SalePopup.tscn (field_input_wide.png v5).
 const SALE_POPUP_SCENE_SIZE := Vector2(559, 139)
@@ -26,12 +37,12 @@ const SALE_POPUP_SCALE := 0.5
 ## Em retrato (tela mais alta que larga) os componentes crescem para continuarem
 ## legíveis no celular em pé; os contadores encolhem se não couberem.
 const PORTRAIT_BOOST := 1.35
-const FULL_BACKPACK_MESSAGE := "Mochila cheia! Leve as caixas ao Balcão de vendas."
+## Chave do aviso de mochila cheia (localization/ui.csv).
+const FULL_BACKPACK_MESSAGE := "BACKPACK_FULL"
 
 @onready var root_control: Control = $Root
 @onready var level_panel: PlayerLevelPanel = $Root/PlayerLevelPanel
 @onready var mission_panel: MissionPanel = $Root/MissionPanel
-@onready var money_counter: HudCounter = $Root/Counters/MoneyCounter
 @onready var tomato_counter: HudCounter = $Root/Counters/TomatoCounter
 @onready var crate_counter: HudCounter = $Root/Counters/CrateCounter
 @onready var counters: Control = $Root/Counters
@@ -49,12 +60,44 @@ var missions: MissionTracker
 var _banner_timer: SceneTreeTimer
 var _ui_scale := 1.0
 var shop_modal: FarmShopModal
+var settings_modal: FarmSettingsModal
+var settings_button: SettingsButton
+var wallet_bar: HudWalletBar
+var modal_layer: CanvasLayer
+## FARM-003: chave + argumentos do aviso atual da faixa, para retraduzir na hora
+## em que o idioma muda nas Configurações.
+var _banner_key := ""
+var _banner_args: Array = []
 
 func _ready() -> void:
     root_control.resized.connect(layout)
+    FarmSettings.load_and_apply()
     store_button.pressed.connect(_on_store_pressed)
+    wallet_bar = HudWalletBar.new()
+    wallet_bar.name = "WalletBar"
+    counters.add_child(wallet_bar)
+    # Tomates e caixas saem do topo direito (a mochila aparece nas costas do
+    # fazendeiro e o aviso de mochila cheia continua na faixa).
+    tomato_counter.visible = false
+    crate_counter.visible = false
+    settings_button = SettingsButton.new()
+    settings_button.name = "SettingsButton"
+    root_control.add_child(settings_button)
+    settings_button.pressed.connect(_on_settings_pressed)
+    modal_layer = CanvasLayer.new()
+    modal_layer.name = "ModalLayer"
+    modal_layer.layer = MODAL_LAYER
+    add_child(modal_layer)
+    var modal_root := Control.new()
+    modal_root.name = "ModalRoot"
+    modal_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+    modal_layer.add_child(modal_root)
+    modal_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
     shop_modal = SHOP_MODAL_SCENE.instantiate() as FarmShopModal
-    root_control.add_child(shop_modal)
+    modal_root.add_child(shop_modal)
+    settings_modal = FarmSettingsModal.new()
+    settings_modal.name = "FarmSettingsModal"
+    modal_root.add_child(settings_modal)
     reward_popup.collected.connect(_on_reward_collected)
     layout()
 
@@ -64,6 +107,7 @@ func setup(p_wallet: Wallet, p_inventory: HarvestInventory, sales: SalesControll
     player_level = level
     missions = tracker
     wallet.balance_changed.connect(_on_balance_changed)
+    wallet.gold_changed.connect(_on_gold_changed)
     inventory.amount_changed.connect(_on_inventory_changed)
     sales.sale_completed.connect(_on_sale_completed)
     level.changed.connect(_on_level_changed)
@@ -75,7 +119,8 @@ func setup(p_wallet: Wallet, p_inventory: HarvestInventory, sales: SalesControll
 ## Relê todos os estados (início de jogo ou depois de carregar um save).
 func refresh() -> void:
     if wallet:
-        money_counter.set_value(wallet.get_balance(), false)
+        wallet_bar.set_money(wallet.get_balance(), false)
+        wallet_bar.set_gold(wallet.get_gold(), false)
     if inventory:
         _update_inventory(false)
     if player_level:
@@ -87,7 +132,10 @@ func refresh() -> void:
 ## API direta (prompt UI v5). No jogo os valores chegam pelos sinais de Wallet
 ## e HarvestInventory; estes métodos servem para preview e testes.
 func set_money(value: int) -> void:
-    money_counter.set_value(value)
+    wallet_bar.set_money(value)
+
+func set_gold(value: int) -> void:
+    wallet_bar.set_gold(value)
 
 func set_tomatoes(current: int, maximum: int) -> void:
     tomato_counter.set_ratio(current, maximum)
@@ -99,7 +147,10 @@ func set_mission(title: String, current: int, target: int) -> void:
     mission_panel.set_mission_progress(title, current, target)
 
 func get_money_text() -> String:
-    return money_counter.get_value_text()
+    return wallet_bar.get_money_text()
+
+func get_gold_text() -> String:
+    return wallet_bar.get_gold_text()
 
 func get_tomato_text() -> String:
     return tomato_counter.get_value_text()
@@ -134,20 +185,15 @@ func layout_for(area: Vector2) -> void:
     mission_panel.scale = Vector2.ONE * MISSION_SCALE * k
     mission_panel.position = Vector2(MARGIN, MARGIN + level_size.y + GAP)
 
-    var row: Array[HudCounter] = [money_counter, tomato_counter, crate_counter]
-    var row_width := 0.0
-    for counter in row:
-        row_width += counter.size.x
-    row_width += GAP / (COUNTER_SCALE * k) * (row.size() - 1)
+    # Topo direito: só o bloco translúcido de dinheiro + ouro. Encolhe se não
+    # couber ao lado do painel de nível.
     var available := area.x - (MARGIN + level_size.x + GAP * 2.0) - MARGIN
-    var counter_scale := minf(COUNTER_SCALE * k, available / row_width)
-    var x := area.x - MARGIN - row_width * counter_scale
+    var wallet_scale := minf(WALLET_SCALE * k, available / HudWalletBar.DESIGN_SIZE.x)
     counters.position = Vector2.ZERO
-    for counter in row:
-        counter.scale = Vector2.ONE * counter_scale
-        counter.position = Vector2(x, MARGIN + (level_size.y - counter.size.y * counter_scale) * 0.5)
-        x += counter.size.x * counter_scale + GAP
-    var counters_bottom := money_counter.position.y + money_counter.size.y * counter_scale
+    wallet_bar.scale = Vector2.ONE * wallet_scale
+    var wallet_size := HudWalletBar.DESIGN_SIZE * wallet_scale
+    wallet_bar.position = Vector2(area.x - MARGIN - wallet_size.x, MARGIN + maxf(0.0, (level_size.y - wallet_size.y) * 0.5))
+    var counters_bottom := wallet_bar.position.y + wallet_size.y
 
     info_banner.scale = Vector2.ONE * BANNER_SCALE * k
     var banner_size := info_banner.size * BANNER_SCALE * k
@@ -162,13 +208,20 @@ func layout_for(area: Vector2) -> void:
     store_button.scale = Vector2.ONE * STORE_SCALE * k
     var store_size := store_button.size * STORE_SCALE * k
     store_button.position = area - store_size - Vector2(MARGIN, MARGIN)
+    # Engrenagem logo acima da Loja, centrada nela.
+    settings_button.scale = Vector2.ONE * SETTINGS_SCALE * k
+    var settings_size := SettingsButton.DESIGN_SIZE * SETTINGS_SCALE * k
+    settings_button.position = Vector2(store_button.position.x + (store_size.x - settings_size.x) * 0.5, store_button.position.y - settings_size.y - GAP)
 
     # Avisos de venda alinhados à direita, embaixo dos contadores, fora da faixa.
     var popup_width := SALE_POPUP_SCENE_SIZE.x * SALE_POPUP_SCALE * k
     sale_popups.position = Vector2(area.x - MARGIN - popup_width, counters_bottom + GAP)
 
 func _on_balance_changed(balance: int, _delta: int) -> void:
-    money_counter.set_value(balance)
+    wallet_bar.set_money(balance)
+
+func _on_gold_changed(gold: int, _delta: int) -> void:
+    wallet_bar.set_gold(gold)
 
 func _on_inventory_changed(_item: StringName, _amount: int) -> void:
     _update_inventory(true)
@@ -178,9 +231,9 @@ func _update_inventory(animate: bool) -> void:
     tomato_counter.set_ratio(inventory.get_amount(HarvestInventory.DEFAULT_ITEM), inventory.get_capacity(), animate)
     crate_counter.set_ratio(inventory.get_crate_count(), inventory.max_crates, animate)
     if inventory.is_full():
-        info_banner.show_message(FULL_BACKPACK_MESSAGE)
-    elif info_banner.message_label.text == FULL_BACKPACK_MESSAGE:
-        info_banner.hide_message()
+        _show_banner_key(FULL_BACKPACK_MESSAGE, [])
+    elif _banner_key == FULL_BACKPACK_MESSAGE:
+        _hide_banner()
 
 ## Aviso de venda abaixo do contador de dinheiro; vários avisos se empilham.
 func _on_sale_completed(_customer: Customer, crates: int, _units: int, money: int) -> void:
@@ -214,7 +267,20 @@ func _on_reward_collected(_amount: int) -> void:
     if missions:
         missions.claim_reward()
 
+func _on_settings_pressed() -> void:
+    settings_pressed.emit()
+    if shop_modal and shop_modal.is_shop_open():
+        shop_modal.close_shop()
+    if settings_modal:
+        settings_modal.open_settings()
+
+## Alguma modal (loja ou configurações) aberta por cima do jogo.
+func is_modal_open() -> bool:
+    return (shop_modal != null and shop_modal.is_shop_open()) or (settings_modal != null and settings_modal.is_open())
+
 func _on_store_pressed() -> void:
+    if settings_modal and settings_modal.is_open():
+        settings_modal.close_settings()
     store_pressed.emit()
     if shop_modal:
         shop_modal.open_shop()
@@ -225,13 +291,31 @@ func show_message(title: String, message: String, button_text: String = MessageP
     message_popup.show_message(title, message, button_text)
     return message_popup
 
-## Mensagem temporária na faixa floral.
-func show_banner(text: String, seconds: float) -> void:
-    info_banner.show_message(text)
+## Mensagem temporária na faixa floral. `text` é de preferência uma chave de
+## localization/ui.csv e `args` os valores do %d/%s (Strings também são
+## traduzidas; "@lower:CHAVE" em minúsculas): assim a faixa troca de idioma na
+## hora. Texto já pronto também funciona (fica como está).
+func show_banner(text: String, seconds: float, args: Array = []) -> void:
+    _show_banner_key(text, args)
     _banner_timer = get_tree().create_timer(seconds)
     var timer := _banner_timer
+    var key := text
     timer.timeout.connect(func() -> void:
-        if _banner_timer == timer and info_banner.message_label.text == text:
-            info_banner.hide_message()
+        if _banner_timer == timer and _banner_key == key:
+            _hide_banner()
             if inventory and inventory.is_full():
-                info_banner.show_message(FULL_BACKPACK_MESSAGE))
+                _show_banner_key(FULL_BACKPACK_MESSAGE, []))
+
+func _show_banner_key(key: String, args: Array) -> void:
+    _banner_key = key
+    _banner_args = args
+    info_banner.show_message(UiStyle.tr_format(key, args))
+
+func _hide_banner() -> void:
+    _banner_key = ""
+    _banner_args = []
+    info_banner.hide_message()
+
+func _notification(what: int) -> void:
+    if what == NOTIFICATION_TRANSLATION_CHANGED and is_node_ready() and info_banner.visible and not _banner_key.is_empty():
+        info_banner.show_message(UiStyle.tr_format(_banner_key, _banner_args))

@@ -18,6 +18,10 @@ signal purchased(grade: int)
 signal locked_touched()
 ## Fazendeiro em cima, sem saldo para continuar.
 signal out_of_money(missing: int)
+## Falta do recurso adicional da contratação inicial.
+signal out_of_material(item: StringName, missing_crates: int)
+## HIRE-FIX-001: fardos/caixas descarregados da mochila na plataforma.
+signal material_delivered(units: int, total_units: int)
 
 const MONEY_TEXTURE := preload("res://assets/sales/money_bundle.png")
 const VIEW_PITCH_DEGREES := 45.0
@@ -32,6 +36,16 @@ const FLIGHT_TIME := 0.45
 const FLIGHT_HEIGHT := 1.9
 const BUNDLE_WIDTH := 0.8
 const HANDS_HEIGHT := 1.1
+## Ícones de custo 30% maiores que a versão anterior.
+const COST_ICON_SCALE := 1.30
+## HIRE-FIX-001: o material da contratação (fardos de madeira, caixas de
+## tomate/milho) sai da mochila um fardo/caixa por vez, voando das costas do
+## fazendeiro até o ícone do material; o contador "n/20" sobe a cada pouso.
+const MATERIAL_INTERVAL := 0.16
+const MATERIAL_FLIGHT_TIME := 0.5
+const MATERIAL_FLIGHT_HEIGHT := 2.2
+const MATERIAL_WIDTH := 1.25
+const BACKPACK_HEIGHT := 2.3
 
 const SHADER_CODE := """
 shader_type spatial;
@@ -98,17 +112,27 @@ var _warned_locked := false
 var rect := Rect2()
 ## Registro para testes: um item por dinheiro que voou {"from", "to"}.
 var flight_log: Array[Dictionary] = []
+## Registro para testes: um item por fardo/caixa descarregado {"item", "units", "from", "to"}.
+var material_log: Array[Dictionary] = []
 
 var _material: ShaderMaterial
 var _title: Label3D
 var _grade_label: Label3D
 var _cost_label: Label3D
 var _cost_icon: Sprite3D
+var _material_icon: Sprite3D
+var _material_label: Label3D
 var _flyers: Array = []
 var _on_pad_time := 0.0
 var _pay_accumulator := 0.0
+var _material_accumulator := 0.0
+## Unidades de material ainda voando (o contador só conta o que pousou).
+var _material_in_flight := 0
+var _material_flyers: Array = []
+var _material_pop_tween: Tween
 var _farmer_on_pad := false
 var _warned_no_money := false
+var _warned_no_material := false
 var _pulse_tween: Tween
 
 static func get_size() -> Vector2:
@@ -122,6 +146,13 @@ func setup(center_xz: Vector2, p_hiring: HelperHiring, p_wallet: Wallet) -> void
     position = Vector3(center_xz.x, 0.035, center_xz.y)
     hiring.grade_changed.connect(func(_g: int) -> void: _refresh())
     hiring.paid_changed.connect(func(_p: int, _c: int) -> void: _refresh())
+    hiring.material_changed.connect(func(_u: int, _n: int) -> void: _refresh())
+    hiring.requirement_failed.connect(func(item: StringName, missing: int) -> void:
+        if not _warned_no_material:
+            _warned_no_material = true
+            out_of_material.emit(item, missing)
+        _refresh()
+    )
     _refresh()
 
 func _ready() -> void:
@@ -148,7 +179,7 @@ func _ready() -> void:
     _cost_icon = Sprite3D.new()
     _cost_icon.name = "CostIcon"
     _cost_icon.texture = MONEY_TEXTURE
-    _cost_icon.pixel_size = 0.62 / float(MONEY_TEXTURE.get_width())
+    _cost_icon.pixel_size = (0.62 * COST_ICON_SCALE) / float(MONEY_TEXTURE.get_width())
     _cost_icon.shaded = false
     _cost_icon.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
     _cost_icon.rotation_degrees.x = -90.0
@@ -156,6 +187,17 @@ func _ready() -> void:
     _cost_icon.position = Vector3(-size.x * 0.26, 0.02, _uv_to_z(0.78))
     _cost_icon.render_priority = 1
     add_child(_cost_icon)
+    _material_label = _make_label("MaterialLabel", 0.78, 82, UiStyle.TEXT_BROWN, UiStyle.TEXT_CREAM, 12)
+    _material_label.position.x = size.x * 0.30
+    _material_icon = Sprite3D.new()
+    _material_icon.name = "MaterialIcon"
+    _material_icon.shaded = false
+    _material_icon.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+    _material_icon.rotation_degrees.x = -90.0
+    _material_icon.scale = Vector3(1.0, SCREEN_STRETCH, 1.0)
+    _material_icon.position = Vector3(size.x * 0.08, 0.02, _uv_to_z(0.78))
+    _material_icon.render_priority = 1
+    add_child(_material_icon)
     _refresh()
 
 func _make_label(label_name: String, uv_y: float, font_size: int, color: Color, outline: Color, outline_size: int) -> Label3D:
@@ -194,8 +236,9 @@ func is_farmer_on_pad() -> bool:
     return _farmer_on_pad
 
 ## Chame por frame com a posição do fazendeiro. Retorna quantos dinheiros
-## foram pagos neste frame.
-func process_farmer_position(world_pos: Vector3, delta: float) -> int:
+## foram pagos neste frame. Com `inventory` (mochila), a plataforma também
+## descarrega o material da contratação inicial (HIRE-FIX-001).
+func process_farmer_position(world_pos: Vector3, delta: float, inventory: HarvestInventory = null) -> int:
     _farmer_on_pad = contains_point(world_pos)
     if locked:
         if _farmer_on_pad and not _warned_locked:
@@ -205,15 +248,25 @@ func process_farmer_position(world_pos: Vector3, delta: float) -> int:
     if not _farmer_on_pad or hiring == null or wallet == null or hiring.is_max():
         _on_pad_time = 0.0
         _pay_accumulator = 0.0
+        _material_accumulator = 0.0
         _warned_no_money = false
+        _warned_no_material = false
         return 0
     _on_pad_time += delta
     if _on_pad_time < START_DELAY:
         return 0
+    _unload_material(world_pos, delta, inventory)
     if wallet.get_balance() <= 0:
         if not _warned_no_money:
             _warned_no_money = true
             out_of_money.emit(hiring.get_remaining_cost())
+        return 0
+    if hiring.grade == 0 and hiring.get_remaining_cost() <= 1 and not hiring.has_initial_requirement():
+        if _material_in_flight > 0 or (inventory != null and inventory.get_amount(hiring.requirement_item) > 0):
+            return 0
+        if not _warned_no_material:
+            _warned_no_material = true
+            out_of_material.emit(hiring.requirement_item, hiring.get_missing_requirement_crates())
         return 0
     _pay_accumulator += delta
     var paid_now := 0
@@ -235,6 +288,93 @@ func process_farmer_position(world_pos: Vector3, delta: float) -> int:
             break
     return paid_now
 
+## Descarrega um fardo/caixa do material a cada MATERIAL_INTERVAL enquanto a
+## mochila tiver o item e ainda faltar material para a contratação.
+func _unload_material(world_pos: Vector3, delta: float, inventory: HarvestInventory) -> void:
+    if inventory == null or hiring.grade > 0 or hiring.requirement_crates <= 0:
+        return
+    if hiring.get_missing_requirement_units() <= 0 or inventory.get_amount(hiring.requirement_item) <= 0:
+        _material_accumulator = 0.0
+        return
+    _material_accumulator += delta
+    var from := world_pos + Vector3(0.0, BACKPACK_HEIGHT, 0.0)
+    while _material_accumulator >= MATERIAL_INTERVAL:
+        _material_accumulator -= MATERIAL_INTERVAL
+        var units := hiring.deliver_material(inventory, hiring.requirement_units_per_crate)
+        if units <= 0:
+            _material_accumulator = 0.0
+            return
+        _launch_material(from, units)
+        material_delivered.emit(units, hiring.material_units)
+        _warned_no_material = false
+
+## Material já pousado na plataforma (o que ainda voa não conta no "n/20").
+func get_material_landed_crates() -> int:
+    if hiring == null:
+        return 0
+    return mini(hiring.requirement_crates, maxi(hiring.material_units - _material_in_flight, 0) / hiring.requirement_units_per_crate)
+
+func get_material_text() -> String:
+    return _material_label.text if _material_label else ""
+
+func get_material_flying_count() -> int:
+    return _material_flyers.size()
+
+func _launch_material(from: Vector3, units: int) -> void:
+    var item := hiring.requirement_item
+    if not is_inside_tree() or _material_icon == null:
+        material_log.append({"item": item, "units": units, "from": from, "to": from})
+        _refresh()
+        return
+    var to := _material_icon.global_position + Vector3(0.0, 0.15, 0.0)
+    var flyer := Node3D.new()
+    flyer.name = "DeliveredMaterial_%d" % material_log.size()
+    flyer.top_level = true
+    add_child(flyer)
+    flyer.global_position = from
+    var texture := ItemArt.full_texture(item)
+    var sprite := Sprite3D.new()
+    sprite.name = "MaterialSprite"
+    sprite.texture = texture
+    sprite.pixel_size = MATERIAL_WIDTH * ItemArt.width_scale(item) / float(texture.get_width())
+    sprite.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+    sprite.shaded = false
+    sprite.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
+    sprite.render_priority = 4
+    flyer.add_child(sprite)
+    _material_flyers.append(flyer)
+    _material_in_flight += units
+    material_log.append({"item": item, "units": units, "from": from, "to": to})
+    _refresh()
+    var tween := create_tween()
+    tween.tween_method(_move_material.bind(flyer, from, to), 0.0, 1.0, MATERIAL_FLIGHT_TIME)
+    tween.tween_callback(_land_material.bind(flyer, units))
+
+func _move_material(t: float, flyer, from: Vector3, to: Vector3) -> void:
+    if is_instance_valid(flyer):
+        flyer.global_position = from.lerp(to, t) + Vector3(0.0, 4.0 * t * (1.0 - t) * MATERIAL_FLIGHT_HEIGHT, 0.0)
+        flyer.scale = Vector3.ONE * lerpf(1.0, 0.55, t)
+
+func _land_material(flyer, units: int) -> void:
+    _material_flyers.erase(flyer)
+    if is_instance_valid(flyer):
+        flyer.queue_free()
+    _material_in_flight = maxi(0, _material_in_flight - units)
+    _refresh()
+    _pop_material_icon()
+
+func _pop_material_icon() -> void:
+    if not is_inside_tree() or _material_icon == null or not _material_icon.visible:
+        return
+    if _material_pop_tween and _material_pop_tween.is_valid():
+        _material_pop_tween.kill()
+    var base := Vector3(1.0, SCREEN_STRETCH, 1.0)
+    _material_icon.scale = base * 1.25
+    _material_label.scale = base * 1.2
+    _material_pop_tween = create_tween().set_parallel(true)
+    _material_pop_tween.tween_property(_material_icon, "scale", base, 0.18)
+    _material_pop_tween.tween_property(_material_label, "scale", base, 0.18)
+
 func _refresh() -> void:
     if _material == null:
         return
@@ -242,6 +382,7 @@ func _refresh() -> void:
     var is_max := hiring != null and hiring.is_max()
     var cost := HelperConfig.next_cost(grade)
     var paid := hiring.paid if hiring else 0
+    var show_material := hiring != null and grade == 0 and hiring.requirement_crates > 0
     _material.set_shader_parameter("grade", grade)
     _material.set_shader_parameter("max_grade", HelperConfig.MAX_GRADE)
     _material.set_shader_parameter("progress", 1.0 if is_max else clampf(float(paid) / float(maxi(cost, 1)), 0.0, 1.0))
@@ -249,11 +390,21 @@ func _refresh() -> void:
     _grade_label.text = tr("HELPER_GRADE") % [grade, HelperConfig.MAX_GRADE]
     _cost_icon.visible = not is_max
     _cost_label.text = tr("HELPER_MAX") if is_max else UiStyle.format_int(maxi(cost - paid, 0))
-    _cost_label.position.x = 0.0 if is_max else get_size().x * 0.12
+    _cost_icon.position.x = -get_size().x * (0.34 if show_material else 0.26)
+    _cost_label.position.x = 0.0 if is_max else get_size().x * (-0.20 if show_material else 0.12)
+    _material_icon.visible = show_material and not is_max
+    _material_label.visible = show_material and not is_max
+    if show_material:
+        _material_icon.texture = ItemArt.full_texture(hiring.requirement_item)
+        _material_icon.pixel_size = (0.52 * COST_ICON_SCALE) * ItemArt.width_scale(hiring.requirement_item) / float(_material_icon.texture.get_width())
+        # HIRE-FIX-001: contagem visível do que já foi descarregado ("7/20").
+        _material_label.text = "%d/%d" % [get_material_landed_crates(), hiring.requirement_crates]
     _material.set_shader_parameter("locked", 1.0 if locked else 0.0)
     _grade_label.visible = not locked
     if locked:
         _cost_icon.visible = false
+        _material_icon.visible = false
+        _material_label.visible = false
         _cost_label.text = tr("AREA_SOON")
         _cost_label.position.x = 0.0
 
@@ -302,6 +453,12 @@ func finish_flights() -> void:
         if is_instance_valid(flyer):
             flyer.queue_free()
     _flyers.clear()
+    for flyer in _material_flyers:
+        if is_instance_valid(flyer):
+            flyer.queue_free()
+    _material_flyers.clear()
+    _material_in_flight = 0
+    _refresh()
 
 func _play_pulse() -> void:
     if not is_inside_tree():

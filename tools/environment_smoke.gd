@@ -95,7 +95,10 @@ func _check_ground(world: FarmWorld) -> void:
         return
     _check(ground.mesh is BoxMesh, "Ground mesh changed")
     if ground.mesh is BoxMesh:
-        _check(is_equal_approx((ground.mesh as BoxMesh).size.x, world.farm_size), "Ground width changed")
+        var map := world.get_map_rect()
+        var size := (ground.mesh as BoxMesh).size
+        _check(Vector2(size.x, size.z).is_equal_approx(map.size), "Ground size differs from expanded map")
+        _check(Vector2(ground.position.x, ground.position.z).is_equal_approx(map.get_center()), "Ground center differs from expanded map")
     var material := ground.material_override as ShaderMaterial
     _check(material != null, "GrassSurface lacks ShaderMaterial")
     if material == null:
@@ -135,7 +138,7 @@ func _check_placements(world: FarmWorld) -> void:
         _check(radius > 0.0, "Nonpositive clearance: " + asset)
         _check(is_equal_approx(point.y, 0.02), "Decoration not grounded: " + asset)
         _check(env.is_allowed_position(point, radius), "Forbidden placement: " + asset + " at " + str(point))
-        _check(absf(point.x) + radius <= world.farm_size * 0.5 - 1.0 and absf(point.z) + radius <= world.farm_size * 0.5 - 1.0, "Placement crosses world boundary: " + asset)
+        _check(world.get_map_rect().grow(-1.0 - radius).has_point(Vector2(point.x, point.z)), "Placement crosses world boundary: " + asset)
         for plot in world.get_node("PlantingArea").get_children():
             var shape := (plot.get_node("CollisionShape3D") as CollisionShape3D).shape as BoxShape3D
             var dx := absf(point.x - plot.global_position.x)
@@ -178,7 +181,7 @@ func _check_seed(world: FarmWorld) -> void:
     duplicate.reserved_areas = original.reserved_areas.duplicate()
     duplicate.blocked_rects = original.blocked_rects.duplicate()
     var mesh := MeshInstance3D.new()
-    duplicate.setup(mesh, world.farm_size, world.get_planting_area_half_width(),
+    duplicate.setup(mesh, world.get_map_rect(), world.get_planting_area_half_width(),
         FarmWorld.PLANTING_NEAR_EDGE_Z,
         FarmWorld.PLANTING_NEAR_EDGE_Z + world.planting_plot_size.y,
         world.sales_counter.position)

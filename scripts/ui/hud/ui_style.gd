@@ -117,3 +117,22 @@ static func pulse(control: Control, strength: float = 0.12) -> void:
     var tween := control.create_tween()
     tween.tween_property(control, "scale", Vector2.ONE * (1.0 + strength), 0.08).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
     tween.tween_property(control, "scale", Vector2.ONE, 0.16).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+
+## FARM-003: traduz `key` (localization/ui.csv) e aplica `args` com %. Um arg
+## String é traduzido também (nome de cultura etc.); com o prefixo "@lower:" o
+## texto traduzido vai em minúsculas ("@lower:CROP_CORN" -> "milho").
+static func tr_format(key: String, args: Array = []) -> String:
+    var text := String(TranslationServer.translate(key))
+    if args.is_empty():
+        return text
+    var values: Array = []
+    for arg in args:
+        if arg is String or arg is StringName:
+            var s := String(arg)
+            if s.begins_with("@lower:"):
+                values.append(String(TranslationServer.translate(s.substr(7))).to_lower())
+            else:
+                values.append(String(TranslationServer.translate(s)))
+        else:
+            values.append(arg)
+    return text % values

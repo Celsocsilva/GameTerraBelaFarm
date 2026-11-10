@@ -52,6 +52,29 @@ const PROPS := [
     "res://assets/decor/farm_props/lantern_post.png"
 ]
 
+## FV-POLISH-001: largura (m) de cada objeto de fazenda em escala natural ao
+## lado do fazendeiro (cápsula de 1,8 m de altura e 0,9 m de largura). Antes
+## todos saíam com 0,75–1,3 m e o poste de lampião ficava da altura do joelho.
+## A altura na tela segue a proporção do PNG (lampião ~2,5 m, barril ~1,1 m).
+## FV-HUD-002 (09/11): pedido do Celso — barril, fardo, toras e lampião com o
+## DOBRO do tamanho do FV-POLISH-001 (PROP_SCALE). A folga de posicionamento e
+## o cilindro de colisão acompanham a largura, então os props continuam fora
+## de balcão, pontes, corredores e áreas de cultivo.
+const PROP_SCALE := 2.0
+## FARM-003 (09/11): pedido do Celso — barris (tambores) 20% menores.
+const BARREL_SCALE := 0.8
+const PROP_WIDTHS := {
+    "res://assets/decor/farm_props/hay_bale.png": Vector2(1.6, 1.9) * PROP_SCALE,
+    "res://assets/decor/farm_props/barrel_wood.png": Vector2(1.0, 1.15) * PROP_SCALE * BARREL_SCALE,
+    "res://assets/decor/farm_props/wood_logs.png": Vector2(1.7, 2.0) * PROP_SCALE,
+    "res://assets/decor/farm_props/lantern_post.png": Vector2(1.85, 2.05) * PROP_SCALE,
+}
+
+## FENCE-002 (09/11): pedido do Celso — as árvores que parecem um ipê (a de
+## flores rosa, tree_pink_blossom) ficam 20% maiores. As outras não mudam.
+const IPE_TREE := "res://assets/decor/trees/tree_pink_blossom.png"
+const IPE_SCALE := 1.2
+
 var placements: Array[Dictionary] = []
 ## Áreas reservadas por outros sistemas (ex.: RiverSystem, ENV-002). Cada item
 ## expõe blocks_decoration(point: Vector3, radius: float) -> bool.
@@ -59,16 +82,20 @@ var reserved_areas: Array[Object] = []
 ## Retângulos XZ bloqueados (já com folga) informados pelo FarmWorld: cerca,
 ## galpão e parcela extra (FV-FARM-008).
 var blocked_rects: Array[Rect2] = []
-var _farm_size := 0.0
+var _farm_rect := Rect2()
 var _plot_half_width := 0.0
 var _plot_start_z := 0.0
 var _plot_end_z := 0.0
 var _sales_position := Vector3.ZERO
 var _rng := RandomNumberGenerator.new()
 
-func setup(ground_mesh: MeshInstance3D, farm_size: float, plot_half_width: float,
+func setup(ground_mesh: MeshInstance3D, farm_bounds: Variant, plot_half_width: float,
         plot_start_z: float, plot_end_z: float, sales_position: Vector3) -> void:
-    _farm_size = farm_size
+    if farm_bounds is Rect2:
+        _farm_rect = farm_bounds
+    else:
+        var legacy_size := float(farm_bounds)
+        _farm_rect = Rect2(Vector2.ONE * -legacy_size * 0.5, Vector2.ONE * legacy_size)
     _plot_half_width = plot_half_width
     _plot_start_z = plot_start_z
     _plot_end_z = plot_end_z
@@ -97,37 +124,44 @@ func _place_category(category: String, paths: Array, density: float,
     var group := Node3D.new()
     group.name = category
     add_child(group)
-    var target := roundi(density * _farm_size * _farm_size / 100.0)
+    var target := roundi(density * _farm_rect.get_area() / 100.0)
     var placed := 0
-    for attempt in target * 45:
+    # FV-POLISH-001: mais tentativas — com os pinheiros e as áreas maiores
+    # sobra menos grama livre para as árvores decorativas.
+    for attempt in target * 160:
         if placed >= target:
             break
         var point := _sample_position()
         var width := _rng.randf_range(min_width, max_width)
+        var path: String = paths[_rng.randi_range(0, paths.size() - 1)]
+        if PROP_WIDTHS.has(path):
+            var range_m: Vector2 = PROP_WIDTHS[path]
+            width = lerpf(range_m.x, range_m.y, inverse_lerp(min_width, max_width, width))
+        if path == IPE_TREE:
+            width *= IPE_SCALE
         var solid := category in ["Trees", "FarmDecorations"] or (category == "Rocks" and width > 0.95)
         var clearance := width * (0.65 if solid else 0.55)
         if not is_allowed_position(point, clearance):
             continue
         if _too_close_to_existing(point, clearance):
             continue
-        var path: String = paths[_rng.randi_range(0, paths.size() - 1)]
         var node := _make_sprite(path, width, point, solid)
         group.add_child(node)
         placements.append({"category": category, "asset": path, "position": point, "clearance": clearance})
         placed += 1
 
 func _sample_position() -> Vector3:
-    var limit := _farm_size * 0.5 - 2.5
     # A maior parte dos detalhes fica no entorno do campo; o resto povoa as bordas.
     var center_bias := _rng.randf() < 0.65
-    var spread := minf(limit, 21.0) if center_bias else limit
-    return Vector3(_rng.randf_range(-spread, spread), 0.02,
-        _rng.randf_range(-spread, spread))
+    if center_bias:
+        return Vector3(_rng.randf_range(-21.0, 21.0), 0.02, _rng.randf_range(-21.0, 21.0))
+    var usable := _farm_rect.grow(-2.5)
+    return Vector3(_rng.randf_range(usable.position.x, usable.end.x), 0.02,
+        _rng.randf_range(usable.position.y, usable.end.y))
 
 ## Máscara espacial pública para a cena de QA e futuros módulos de expansão.
 func is_allowed_position(point: Vector3, radius: float = 0.0) -> bool:
-    var edge := _farm_size * 0.5 - 1.0
-    if absf(point.x) + radius > edge or absf(point.z) + radius > edge:
+    if not _farm_rect.grow(-1.0 - radius).has_point(Vector2(point.x, point.z)):
         return false
     if absf(point.x) < _plot_half_width + 1.5 + radius and \
             point.z > _plot_start_z - 1.8 - radius and point.z < _plot_end_z + 1.8 + radius:
@@ -140,12 +174,10 @@ func is_allowed_position(point: Vector3, radius: float = 0.0) -> bool:
         return false
     if point.z > _sales_position.z - 6.0 - radius and absf(point.x) < 12.0 + radius:
         return false
-    # Construção, cerca e parcela extra (posições vindas do FarmWorld) e a árvore.
+    # Cerca, parcelas e áreas de cultivo (posições vindas do FarmWorld).
     for rect in blocked_rects:
         if rect.grow(radius).has_point(Vector2(point.x, point.z)):
             return false
-    if Vector2(point.x + 10.0, point.z - 10.0).length() < 2.7 + radius:
-        return false
     for area in reserved_areas:
         if is_instance_valid(area) and area.blocks_decoration(point, radius):
             return false

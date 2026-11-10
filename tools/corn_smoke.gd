@@ -22,6 +22,7 @@ func _run() -> void:
     await _test_farmer_harvest_and_sale()
     await _load_world()
     await _test_backpack_one_product()
+    _test_backpack_motion_stability()
     await _load_world()
     await _test_helper()
     world.queue_free()
@@ -76,7 +77,7 @@ func _test_layout() -> void:
         _check(field.has_point(Vector2(p.x, p.z)), "cova de milho fora do canteiro")
         _check(not world.planting_grid.cells.has(cell["id"]), "id de cova repetido com o tomate")
     _check(not (entry["pad"] as HelperPad).locked, "plataforma do milho ainda bloqueada")
-    _check((world.get_crop_area(&"pumpkin")["pad"] as HelperPad).locked, "abóbora deveria seguir bloqueada")
+    _check(not (world.get_crop_area(&"pumpkin")["pad"] as HelperPad).locked, "abóbora plantável não deveria estar bloqueada")
     _check(world.crop_harvesters.has(&"corn") and (world.crop_harvesters[&"corn"] as HarvestController).item_id == &"corn", "colheita do milho")
     print("CORN_LAYOUT_OK cells=", grid.cells.size())
 
@@ -147,7 +148,7 @@ func _test_farmer_harvest_and_sale() -> void:
     var stack := counter.get_extra_stack(&"corn")
     _check(stack != null and stack.get_stored_total() == carried, "pilha de milho no balcão")
     if stack:
-        _check(is_equal_approx(stack.position.x, CrateStack.slot_x(&"corn", SalesCounter.STACK_SPACING)), "milho fora da vaga reservada")
+        _check(is_equal_approx(stack.position.x, SalesCounter.ITEM_SLOT_X[&"corn"]), "milho fora da vaga reservada")
     var wood_stack := counter.get_extra_stack(WoodConfig.ITEM)
     _check(wood_stack != null and not is_equal_approx(wood_stack.position.x, stack.position.x if stack else 0.0), "madeira e milho na mesma vaga")
     _check(counter.get_stocked_items().has(&"corn"), "milho não está à venda")
@@ -192,6 +193,25 @@ func _test_backpack_one_product() -> void:
     world.set_process(false)
     print("CORN_ONE_PRODUCT_OK")
 
+func _test_backpack_motion_stability() -> void:
+    var backpack := world.backpack
+    backpack.set_amount(&"corn", 1)
+    var crate: Node3D = backpack._crates[0]
+    var partial_texture := (crate.get_node("CrateSprite") as Sprite3D).texture
+    _check(not crate.top_level, "caixa de milho não pode ser top_level")
+    var max_error := 0.0
+    for step in 40:
+        world.farmer.global_position += Vector3(0.13, 0.0, -0.09)
+        world.farmer.rotation.y += 0.07
+        backpack._orient_crates()
+        var expected := backpack.stack_root.to_global(backpack._slot_position(0, 1))
+        max_error = maxf(max_error, crate.global_position.distance_to(expected))
+    backpack.set_amount(&"corn", backpack.units_per_crate)
+    var full_texture := (crate.get_node("CrateSprite") as Sprite3D).texture
+    _check(max_error < 0.0001, "caixa atrasou do fazendeiro durante deslocamento: %.6f" % max_error)
+    _check(partial_texture == full_texture and full_texture == ItemArt.full_texture(&"corn"), "milho alterna textura parcial/cheia")
+    print("CORN_CRATE_STABILITY_OK max_error=%.6f texture=%s" % [max_error, full_texture.resource_path])
+
 func _test_helper() -> void:
     var entry := world.get_crop_area(&"corn")
     var helper := world.crop_helpers.get(&"corn") as FarmHelper
@@ -200,21 +220,42 @@ func _test_helper() -> void:
         return
     var hiring := entry["hiring"] as HelperHiring
     var pad := entry["pad"] as HelperPad
+    # HIRE-FIX-001: as 20 caixas de tomate saem da mochila na plataforma.
+    var inv := world.harvest_inventory
     world.wallet.add(HelperConfig.next_cost(0))
     var center := pad.rect.get_center()
-    for frame in 400:
-        pad.process_farmer_position(Vector3(center.x, 1.0, center.y), 1.0 / 30.0)
+    var delivered := 0
+    for trip in 3:
+        inv.set_amount(&"tomato", mini(inv.get_capacity(), 20 * inv.units_per_crate - delivered))
+        var before := inv.get_amount(&"tomato")
+        for frame in 400:
+            pad.process_farmer_position(Vector3(center.x, 1.0, center.y), 1.0 / 30.0, inv)
+            if hiring.is_hired() or inv.get_amount(&"tomato") == 0:
+                break
+        delivered += before - inv.get_amount(&"tomato")
+        pad.process_farmer_position(Vector3(center.x + 20.0, 1.0, center.y), 1.0 / 30.0, inv)
+    for frame in 60:
+        pad.process_farmer_position(Vector3(center.x, 1.0, center.y), 1.0 / 30.0, inv)
         if hiring.is_hired():
             break
     _check(hiring.is_hired() and helper.visible, "ajudante do milho não foi contratado na plataforma")
+    _check(delivered == 20 * inv.units_per_crate and pad.material_log.size() == 20, "contratação do milho não descarregou 20 caixas de tomate")
     _check(not world.helper_hiring.is_hired(), "contratar o milho contratou o tomate")
     var total := _ripen_all_corn()
     var pile := entry["pile"] as TomatoPile
-    for step in 400:
+    # FV-POLISH-001: o milharal (tamanho do tomate) rende mais que a parcela
+    # comporta (27 caixas): a pilha cheia é esvaziada no meio do teste, como o
+    # fazendeiro faria, e o total empilhado é somado.
+    var stacked := 0
+    for step in 800:
         helper.step_instant()
-        if pile.get_stored_total() == total:
+        if pile.is_full():
+            stacked += pile.take_units(pile.get_stored_total())
+        if stacked + pile.get_stored_total() == total:
             break
-    _check(pile.get_stored_total() == total, "ajudante não empilhou todo o milho: %d/%d" % [pile.get_stored_total(), total])
+    _check(stacked + pile.get_stored_total() == total, "ajudante não empilhou todo o milho: %d/%d" % [stacked + pile.get_stored_total(), total])
+    if pile.get_stored_total() == 0:
+        pile.add_units(16)
     _check(world.tomato_pile.get_stored_total() == 0, "milho foi para a pilha do tomate")
     # Fazendeiro recolhe a pilha de milho na parcela.
     var drop := pile.get_drop_point()
