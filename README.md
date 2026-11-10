@@ -44,6 +44,8 @@ A ambientação ENV-001 aplica grama repetível ao chão e distribui flores, tuf
 
 O rio ENV-002 atravessa o lado oeste do mapa, do norte até a saída a sudoeste, com uma ponte de madeira com cordas e uma ponte de pedra com lanternas. Ele não toca os canteiros nem o balcão, bloqueia a passagem fora das pontes e reserva um bolsão a oeste para novas áreas. A água tem animação leve por shader. Arquitetura, colisões e como adicionar segmentos ou pontes: [docs/RIVER_AND_BRIDGES.md](docs/RIVER_AND_BRIDGES.md); testes: [docs/RIVER_BRIDGES_QA.md](docs/RIVER_BRIDGES_QA.md).
 
+O mapa jogável mantém a borda esquerda e o rodapé originais e recebeu 10% adicionais à direita e ao norte (70,4 × 70,4 m). Milho e abóbora ficam escalonados, evitando o alinhamento rígido e preservando pontes e corredores. A contratação inicial custa 100 dinheiros mais 20 volumes depositados na banca: fardos de madeira para o ajudante do tomate, caixas de tomate para o ajudante do milho e caixas de milho para o futuro ajudante da abóbora. A plataforma da abóbora permanece bloqueada enquanto o ciclo plantável dessa cultura não estiver disponível. Evidências e comandos: [docs/evidence/map-helper-002/README.md](docs/evidence/map-helper-002/README.md).
+
 Para abrir o jogo, importe a pasta do repositório na Godot 4.7.2 e execute `scenes/world/farm_world.tscn` (cena principal em `project.godot`). Use setas ou joystick virtual para mover o fazendeiro. A grama é aplicada somente ao chão; as texturas de solo de cultivo existentes continuam sobre ela.
 
 O legado foi removido da árvore atual, mas permanece no histórico. Para recuperar um arquivo específico da versão anterior:
