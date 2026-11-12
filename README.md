@@ -34,6 +34,10 @@ O mapa deverá reservar espaço para expansão e futuras cadeias produtivas, inc
 - **Persistência:** arquivos versionados e seguros em `user://`; não usar armazenamento local de navegador.
 - **Web:** a implementação legada em HTML/JavaScript/CSS serve apenas como referência de regras e comportamento.
 
+## Referência visual do personagem
+
+A identidade visual oficial do fazendeiro foi aprovada para o Farm Victory. Consulte [FV-003 — Referência visual oficial do fazendeiro](docs/art-direction/FV-003-fazendeiro-referencia-oficial.md) para o design, os estados de animação e o pipeline Meshy MCP → Codex → Godot. A imagem original está preservada na Biblioteca do ChatGPT em `/GAME FARM VICTORY/Referencias/Personagens/Fazendeiro_Referencia_Oficial.png` e ainda precisa ser copiada para o repositório antes da geração 3D.
+
 ## Estado atual
 
 O protótipo executável usa Godot 4.7.2 com renderizador Mobile. O vertical slice completo ainda precisa de integração de persistência e validação em dispositivo Android real.
