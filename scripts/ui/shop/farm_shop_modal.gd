@@ -50,8 +50,10 @@ func _notification(what: int) -> void:
         _translate_and_populate()
 
 func open_shop() -> void:
-    _category_id = "boosters"
-    _selected_id = "speed_growth"
+    # As ofertas com arte passam a ser a vitrine inicial; elas não disparam
+    # qualquer compra até a integração de plataforma estar disponível.
+    _category_id = "bundles"
+    _selected_id = "iap_vip_week"
     _translate_and_populate()
     visible = true
     _layout()
@@ -255,7 +257,8 @@ func _populate_cards() -> void:
 func _make_card(product: Dictionary) -> PanelContainer:
     var card := PanelContainer.new()
     card.add_theme_stylebox_override("panel", _style(PALE, Color("#d9aa70"), 2, 15))
-    card.custom_minimum_size = Vector2(275, 157)
+    var banner := ShopCatalog.banner_for(product)
+    card.custom_minimum_size = Vector2(275, 246 if banner else 157)
     var box_margin := MarginContainer.new()
     for side in ["left", "right", "top", "bottom"]:
         box_margin.add_theme_constant_override("margin_" + side, 8)
@@ -263,6 +266,17 @@ func _make_card(product: Dictionary) -> PanelContainer:
     var column := VBoxContainer.new()
     column.add_theme_constant_override("separation", 6)
     box_margin.add_child(column)
+    if banner:
+        var creative := TextureRect.new()
+        creative.name = "AdCreative"
+        creative.texture = banner
+        creative.custom_minimum_size = Vector2(0, 126)
+        creative.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+        creative.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+        creative.mouse_filter = Control.MOUSE_FILTER_IGNORE
+        # A peça promocional é propositalmente somente a arte: nenhum Label de
+        # preço ou texto é sobreposto sobre ela.
+        column.add_child(creative)
     var row := HBoxContainer.new()
     row.add_theme_constant_override("separation", 8)
     column.add_child(row)
@@ -280,7 +294,7 @@ func _make_card(product: Dictionary) -> PanelContainer:
     name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
     texts.add_child(name_label)
     var unavailable := _label(13, WOOD)
-    unavailable.text = tr("SHOP_UNAVAILABLE")
+    unavailable.text = tr(String(product.get("price_key", "SHOP_UNAVAILABLE")))
     texts.add_child(unavailable)
     var detail_button := Button.new()
     detail_button.custom_minimum_size.y = 36
@@ -302,7 +316,9 @@ func _update_details() -> void:
         _details_desc.text = ""
     else:
         _details_title.text = tr(String(product["title_key"]))
-        _details_desc.text = tr(String(product["description_key"]))
+        var price_key := String(product.get("price_key", ""))
+        var price := tr(price_key) if not price_key.is_empty() else ""
+        _details_desc.text = tr(String(product["description_key"])) + ("\n" + price if not price.is_empty() else "")
     # Sem preço fictício, compra em teste ou crédito de saldo.
     _purchase_button.disabled = true
 
@@ -327,4 +343,7 @@ func _layout_cards() -> void:
     var content_width := maxf(245.0, _layout_width - 75.0)
     var cell_width := (content_width - (columns - 1) * 9.0) / columns
     for child in _product_grid.get_children():
-        (child as Control).custom_minimum_size = Vector2(cell_width, 157)
+        var product := ShopCatalog.products_for_category(_category_id)
+        var product_index := _product_grid.get_children().find(child)
+        var has_banner := product_index >= 0 and product_index < product.size() and ShopCatalog.banner_for(product[product_index]) != null
+        (child as Control).custom_minimum_size = Vector2(cell_width, 246 if has_banner else 157)

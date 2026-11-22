@@ -1,18 +1,35 @@
 # FV-SHOP-001 — Loja IAP do TerraBela Farm
 
+> **Store V2 (10/11/2026):** a tela ativa agora é `StoreScreen`, em
+> `scenes/ui/store/StoreScreen.tscn`. Ela usa um carrossel horizontal com sete
+> ofertas, cartões e botões em `assets/store/`. O catálogo de demonstração é
+> `StoreCatalog`; região comercial (BR/US/ES_DEMO) é separada do idioma.
+> `StorePurchaseService` inicia como indisponível no runtime. O modo simulado,
+> idempotente e auditável é exclusivo dos testes e não representa pagamento real.
+
 ## Escopo implementado
 
-A nova modal é aberta pelo botão **Loja** já existente no HUD. Traz cinco categorias: **Aceleradores**, **Recursos**, **Assistentes**, **Máquinas** e **Pacotes**, com 15 ofertas conceituais. É possível selecionar categorias, consultar um item e fechar a loja pelo botão X ou ação `ui_cancel`.
+A nova modal é aberta pelo botão **Loja** já existente no HUD. Traz cinco categorias: **Aceleradores**, **Recursos**, **Assistentes**, **Máquinas** e **Pacotes**, com 17 ofertas de apresentação. A vitrine inicial é **Pacotes**, onde há duas peças promocionais transparentes, sem texto ou valores gravados na arte. É possível selecionar categorias, consultar um item e fechar a loja pelo botão X ou ação `ui_cancel`.
 
 O visual reutiliza ícones existentes do projeto, com fundo creme, moldura marrom e abas em tons quentes. Os textos são Labels/Button do Godot e estão em `localization/ui.csv` (pt_BR, es e en). Nenhum PNG possui preços ou rótulos fixos novos.
 
-**Não há checkout ou venda real nesta entrega.** Todos os itens têm `available=false`, IDs de produto de plataforma vazios, preço indefinido e botão de compra desabilitado. O catálogo é uma preparação para IAP, não um sistema de pagamentos concluído. Nenhum produto concede recursos, altera a Wallet ou chama uma API de cobrança.
+**Não há checkout ou venda real nesta entrega.** Todos os itens têm `available=false`, IDs de produto de plataforma vazios e botão de compra desabilitado. Os dois pacotes possuem preço de referência e benefícios de produto exibidos na UI, mas o catálogo ainda é apenas uma preparação para IAP: nenhum produto concede recursos, altera a Wallet ou chama uma API de cobrança.
+
+## Ofertas de apresentação
+
+| Oferta | Preço de referência | Benefícios planejados |
+| --- | --- | --- |
+| Pacote VIP (7 dias) | R$ 55,00 | Sem anúncios por 7 dias, +700 moedas, +2.000 dinheiros e 150 moedas a cada 8 horas durante o pacote. |
+| Sem anúncios (mensal) | R$ 44,99 | Sem anúncios por 30 dias, +300 moedas e +1.000 dinheiros por semana durante a assinatura. |
+
+As imagens ficam em `assets/ui/shop/offers/`: `iap_vip_week.png` e `iap_no_ads_month.png`. São peças de anúncio sem texto nem valores incorporados; toda informação comercial é localizada por `localization/ui.csv`.
 
 ## Arquivos
 
 - `scenes/ui/shop/FarmShopModal.tscn` — modal reutilizável em tela cheia
 - `scripts/ui/shop/farm_shop_modal.gd` — layout, localização, seleção e navegação
 - `scripts/ui/shop/shop_catalog.gd` — dados conceituais e ícones
+- `assets/ui/shop/offers/` — criativos visuais dos dois pacotes, sem copy embutida
 - `scripts/ui/hud/farm_hud.gd` — abertura pelo botão existente
 - `localization/ui.csv` — chaves e tradução
 - `tools/shop_smoke.gd` — teste de contrato/segurança e navegação
@@ -27,6 +44,8 @@ Cada oferta contém:
 - `category`: categoria visual
 - `title_key` e `description_key`: textos localizáveis
 - `icon`: referência a imagem permitida e existente
+- `banner` (opcional): criativo somente visual; não pode conter preço ou texto de interface
+- `price_key` e `entitlement` (ofertas IAP): dados de apresentação, nunca concessão local
 - `store_product_id_android` e `store_product_id_ios`: vazios
 - `available`: false
 

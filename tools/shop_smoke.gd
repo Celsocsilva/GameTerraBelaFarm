@@ -11,8 +11,8 @@ func _fail(message: String) -> void:
     quit(1)
 
 func _run() -> void:
-    if ShopCatalog.PRODUCTS.size() != 15 or ShopCatalog.CATEGORIES.size() != 5:
-        return _fail("catálogo deve conter 15 itens em 5 categorias")
+    if ShopCatalog.PRODUCTS.size() != 17 or ShopCatalog.CATEGORIES.size() != 5:
+        return _fail("catálogo deve conter 17 itens em 5 categorias")
     var ids := {}
     for product in ShopCatalog.PRODUCTS:
         var product_id := String(product["id"])
@@ -25,6 +25,14 @@ func _run() -> void:
             return _fail("SKU não aprovado: " + product_id)
         if not ShopCatalog.ICONS.has(String(product["icon"])):
             return _fail("ícone inválido: " + product_id)
+        var banner := ShopCatalog.banner_for(product)
+        if product_id.begins_with("iap_"):
+            if banner == null or banner.resource_path.is_empty():
+                return _fail("banner IAP ausente: " + product_id)
+            if not product.has("price_key") or not product.has("entitlement"):
+                return _fail("contrato de oferta incompleto: " + product_id)
+        elif banner != null:
+            return _fail("banner inesperado: " + product_id)
 
     var world := (load("res://scenes/world/farm_world.tscn") as PackedScene).instantiate() as FarmWorld
     root.add_child(world)
@@ -38,7 +46,7 @@ func _run() -> void:
 
     var before := world.wallet.get_balance()
     world.hud.store_button.pressed.emit()
-    if not shop.is_shop_open() or shop.get_selected_product_id() != "speed_growth":
+    if not shop.is_shop_open() or shop.get_selected_product_id() != "iap_vip_week":
         return _fail("abertura pelo botão da loja")
     await process_frame
     await process_frame
@@ -49,13 +57,27 @@ func _run() -> void:
         var id := String(category["id"])
         shop._choose_category(id)
         var visible_products := ShopCatalog.products_for_category(id)
-        if visible_products.size() != 3 or shop._product_grid.get_child_count() != 3:
+        var expected_count := 5 if id == "bundles" else 3
+        if visible_products.size() != expected_count or shop._product_grid.get_child_count() != expected_count:
             return _fail("categoria " + id)
         shop._select_product(String(visible_products[2]["id"]))
         if shop.get_selected_product_id() != String(visible_products[2]["id"]):
             return _fail("seleção em " + id)
         if not shop._purchase_button.disabled:
             return _fail("compra indevidamente habilitada em " + id)
+    shop._choose_category("bundles")
+    var vip_card := shop._product_grid.get_child(3) as Control
+    var no_ads_card := shop._product_grid.get_child(4) as Control
+    if vip_card.find_children("AdCreative", "TextureRect", true, false).is_empty() or no_ads_card.find_children("AdCreative", "TextureRect", true, false).is_empty():
+        return _fail("banners sem texto/valor não renderizados nos cards")
+    TranslationServer.set_locale("pt_BR")
+    await process_frame
+    shop._select_product("iap_vip_week")
+    if not shop._details_desc.text.contains("R$ 55,00"):
+        return _fail("preço VIP truncado: " + shop._details_desc.text)
+    shop._select_product("iap_no_ads_month")
+    if not shop._details_desc.text.contains("R$ 44,99"):
+        return _fail("preço sem anúncios truncado: " + shop._details_desc.text)
     if world.wallet.get_balance() != before:
         return _fail("navegar no catálogo alterou o saldo")
     for locale in ["pt_BR", "es", "en"]:
