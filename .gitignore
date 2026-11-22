@@ -13,3 +13,4 @@ credentials/
 *.keystore
 *.p12
 *.mobileprovision
+*.blend1
