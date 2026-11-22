@@ -120,6 +120,9 @@ func process_farmer_position(world_position: Vector3, delta: float) -> void:
     var flat_travel := Vector3(travel.x, 0.0, travel.z)
     if flat_travel.length() > 0.05:
         _facing = flat_travel.normalized()
+    if not can_sow():
+        _last_farmer_position = world_position
+        return
     for cell in get_seed_band_cells(world_position, _facing):
         plant_cell(cell["id"])
     _last_farmer_position = world_position
@@ -194,8 +197,50 @@ func get_planting_progress() -> Dictionary:
             planted += 1
     return {"total": cells.size(), "planted": planted, "remaining": cells.size() - planted}
 
+## FARM-005/006: regra de semeadura (ciclo). Enquanto o fazendeiro está
+## plantando, pode semear todo o terreno (mesmo com pés já maduros). Quando a
+## colheita começa em qualquer cultivo, ninguém semeia até colher tudo o que
+## foi plantado, em todos os cultivos; aí as covas colhidas reabrem e a
+## semeadura volta. FarmWorld liga sow_gate a todas as grades; sem ele, a grade
+## decide sozinha (bloqueia só com fruto maduro por colher).
+var sow_gate: Callable = Callable()
+
+## Há fruto maduro esperando colheita nesta grade (RIPE ou sendo colhido).
+func has_ripe_fruit() -> bool:
+    for cell in cells.values():
+        if (cell["state"] == STATE_RIPE or cell["state"] == STATE_HARVESTING) and int(cell["remaining_yield"]) > 0:
+            return true
+    return false
+
+## Há planta semeada que ainda não foi colhida por inteiro (crescendo, madura
+## ou sendo colhida).
+func has_pending_crop() -> bool:
+    for cell in cells.values():
+        if cell["state"] != "EMPTY" and cell["state"] != STATE_HARVESTED:
+            return true
+    return false
+
+## Reabre para semear as covas já colhidas (fim do ciclo de colheita).
+func reopen_harvested() -> int:
+    var count := 0
+    for cell in cells.values():
+        if cell["state"] == STATE_HARVESTED:
+            cell["state"] = "EMPTY"
+            cell["planted_at"] = 0.0
+            cell["remaining_yield"] = 0
+            cell_state_changed.emit(cell["id"], "EMPTY")
+            count += 1
+    return count
+
+func can_sow() -> bool:
+    if sow_gate.is_valid():
+        return bool(sow_gate.call())
+    return not has_ripe_fruit()
+
 func plant_cell(cell_id: String) -> bool:
     if not cells.has(cell_id) or cells[cell_id]["state"] != "EMPTY":
+        return false
+    if not can_sow():
         return false
     cells[cell_id]["state"] = "SEEDED"
     cells[cell_id]["planted_at"] = Time.get_ticks_msec() / 1000.0
