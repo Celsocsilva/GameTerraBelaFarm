@@ -49,6 +49,8 @@ func price_for_units(units: int, item: StringName = &"tomato") -> int:
 func price_per_crate_of(item: StringName) -> int:
     if item == WoodConfig.ITEM:
         return wood_price_per_bundle
+    if item == DairyConfig.ITEM:
+        return DairyConfig.PRICE_PER_CRATE
     if item != &"tomato" and CropCatalog.has_crop(item):
         return CropCatalog.price_per_crate(item)
     return price_per_crate

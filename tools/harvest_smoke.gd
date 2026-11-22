@@ -436,6 +436,8 @@ func _test_approach_from_all_sides() -> void:
             travelled += step
             world.farmer.global_position += dir * step
         await _wait_jobs()
-        _check(cell["state"] == PlantingGrid.STATE_HARVESTED, "Aproximação pelo %s colhe a planta" % key)
+        # FARM-006: colhida a última planta do ciclo, as covas reabrem (EMPTY).
+        var reopened: bool = key == targets.keys()[targets.size() - 1] and cell["state"] == "EMPTY"
+        _check(cell["state"] == PlantingGrid.STATE_HARVESTED or reopened, "Aproximação pelo %s colhe a planta" % key)
     _check_conservation("aproximação")
     print("APPROACH_ALL_SIDES_OK total=", world.harvest_inventory.get_total())

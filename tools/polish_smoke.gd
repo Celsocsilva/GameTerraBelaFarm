@@ -127,6 +127,9 @@ func _test_pines(world: FarmWorld) -> void:
         for bridge in world.river_system.get_bridges():
             var b := Vector2(bridge.global_position.x, bridge.global_position.z)
             _check(p.distance_to(b + Vector2(3.0, 0.0)) > 1.2, "pinheiro na saída da ponte " + bridge.name)
-    _check(east >= 20, "poucos pinheiros no leste: %d" % east)
-    _check(north >= east, "o norte deveria ter mais pinheiros que o leste: %d < %d" % [north, east])
+    # FARM-005: as fileiras do norte ficavam coladas no milho/abóbora e foram
+    # afastadas (folga dos canteiros e caminhos); o norte deixou de ser o bosque
+    # mais denso.
+    _check(east >= 15, "poucos pinheiros no leste: %d" % east)
+    _check(north >= 5, "poucos pinheiros no norte: %d" % north)
     print("POLISH_PINES_OK east=%d north=%d total=%d" % [east, north, grove.get_tree_count()])

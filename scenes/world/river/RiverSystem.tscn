@@ -6,9 +6,9 @@
 
 [node name="RiverSystem" type="Node3D"]
 script = ExtResource("1_river")
-anchor_position = Vector3(-32, 0, -21)
+anchor_position = Vector3(-43.616, 0, -21)
 anchor_width = 3.6
-course = Array[Dictionary]([{"tile": "river_straight_horizontal", "entry": "left", "trim_entry": true, "length_px": 496}, {"tile": "river_corner_left_up"}, {"tile": "river_straight_vertical"}, {"tile": "river_straight_vertical"}, {"tile": "river_corner_right_down"}, {"tile": "river_curve_large_right"}, {"tile": "river_straight_horizontal", "length_px": 57}])
+course = Array[Dictionary]([{"tile": "river_straight_horizontal", "entry": "left", "trim_entry": true, "length_px": 440.02}, {"tile": "river_straight_horizontal"}, {"tile": "river_corner_left_up"}, {"tile": "river_straight_vertical"}, {"tile": "river_straight_vertical"}, {"tile": "river_corner_right_down"}, {"tile": "river_curve_large_right"}, {"tile": "river_straight_horizontal"}, {"tile": "river_straight_horizontal", "length_px": 81}])
 bank_strips = Array[Dictionary]([{"asset": "bank_strip_left_flowers", "position": Vector3(-27.2, 0, -17.86), "width": 3.6}, {"asset": "bank_strip_right_flowers", "position": Vector3(-24.6, 0, -23.65), "width": 3.4}, {"asset": "bank_strip_right_flowers", "position": Vector3(-29.6, 0, 10.04), "width": 3.2}])
 
 [node name="RiverSegments" type="Node3D" parent="."]

@@ -1,7 +1,7 @@
 extends RefCounted
 class_name ShopCatalog
-## Catálogo conceitual de IAP. Nenhum item habilitado, sem SKU ou preço real.
-## Comprar/creditar requer validação de compra pela plataforma e backend.
+## Catálogo de apresentação de IAP. Nenhum item habilitado ou entregável no
+## cliente: comprar/creditar requer validação pela plataforma e pelo backend.
 
 const CATEGORIES := [
     {"id": "boosters", "title_key": "SHOP_TAB_BOOSTERS"},
@@ -21,6 +21,13 @@ const ICONS := {
     "bundle": preload("res://assets/ui/icons/icon_gift.png")
 }
 
+## Artes promocionais sem texto nem preço incorporados. Título, benefícios e
+## preço são elementos localizados da interface, nunca pixels gravados no PNG.
+const OFFER_BANNERS := {
+    "iap_vip_week": preload("res://assets/ui/shop/offers/iap_vip_week.png"),
+    "iap_no_ads_month": preload("res://assets/ui/shop/offers/iap_no_ads_month.png")
+}
+
 ## Identificadores internos estáveis, NÃO são SKUs de Google Play/App Store.
 ## Os campos store_product_id devem continuar vazios até definição comercial.
 const PRODUCTS := [
@@ -38,7 +45,33 @@ const PRODUCTS := [
     {"id": "equipment_cart", "category": "equipment", "title_key": "SHOP_ITEM_CART", "description_key": "SHOP_DESC_EQUIPMENT", "icon": "equipment", "store_product_id_android": "", "store_product_id_ios": "", "available": false},
     {"id": "bundle_starter", "category": "bundles", "title_key": "SHOP_ITEM_STARTER", "description_key": "SHOP_DESC_BUNDLES", "icon": "bundle", "store_product_id_android": "", "store_product_id_ios": "", "available": false},
     {"id": "bundle_farmer", "category": "bundles", "title_key": "SHOP_ITEM_FARMER", "description_key": "SHOP_DESC_BUNDLES", "icon": "bundle", "store_product_id_android": "", "store_product_id_ios": "", "available": false},
-    {"id": "bundle_season", "category": "bundles", "title_key": "SHOP_ITEM_SEASON", "description_key": "SHOP_DESC_BUNDLES", "icon": "bundle", "store_product_id_android": "", "store_product_id_ios": "", "available": false}
+    {"id": "bundle_season", "category": "bundles", "title_key": "SHOP_ITEM_SEASON", "description_key": "SHOP_DESC_BUNDLES", "icon": "bundle", "store_product_id_android": "", "store_product_id_ios": "", "available": false},
+    {
+        "id": "iap_vip_week",
+        "category": "bundles",
+        "title_key": "SHOP_ITEM_VIP_WEEK",
+        "description_key": "SHOP_DESC_VIP_WEEK",
+        "price_key": "SHOP_PRICE_VIP_WEEK",
+        "banner": "iap_vip_week",
+        "icon": "bundle",
+        "entitlement": {"duration_hours": 168, "ad_free": true, "coin_grant": 700, "cash_grant": 2000, "coin_interval_hours": 8, "coin_interval_amount": 150},
+        "store_product_id_android": "",
+        "store_product_id_ios": "",
+        "available": false
+    },
+    {
+        "id": "iap_no_ads_month",
+        "category": "bundles",
+        "title_key": "SHOP_ITEM_NO_ADS_MONTH",
+        "description_key": "SHOP_DESC_NO_ADS_MONTH",
+        "price_key": "SHOP_PRICE_NO_ADS_MONTH",
+        "banner": "iap_no_ads_month",
+        "icon": "bundle",
+        "entitlement": {"duration_days": 30, "ad_free": true, "coin_grant": 300, "weekly_cash_grant": 1000},
+        "store_product_id_android": "",
+        "store_product_id_ios": "",
+        "available": false
+    }
 ]
 
 static func products_for_category(category_id: String) -> Array[Dictionary]:
@@ -53,3 +86,6 @@ static func find_product(product_id: String) -> Dictionary:
         if String(item["id"]) == product_id:
             return item
     return {}
+
+static func banner_for(product: Dictionary) -> Texture2D:
+    return OFFER_BANNERS.get(String(product.get("banner", "")), null)

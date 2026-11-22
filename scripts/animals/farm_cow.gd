@@ -25,6 +25,9 @@ var state: State = State.IDLE
 var target := Vector3.ZERO
 ## Outras vacas do curral, para não escolher destino colado nelas.
 var herd: Array[FarmCow] = []
+## DAIRY-003: retângulos (XZ) do curral onde a vaca não escolhe destino
+## (casinha de ordenha, cocho).
+var avoid: Array[Rect2] = []
 var sprite: Sprite3D
 var frames: Array[Texture2D] = []
 var walked_distance := 0.0
@@ -69,6 +72,12 @@ func _set_frame(index: int) -> void:
     # Pés no chão: a base do PNG fica na origem (o PNG tem ~4% de margem).
     sprite.offset = Vector2(-texture.get_width() * 0.5, -texture.get_height() * 0.04)
 
+## DAIRY-001: pulinho feliz (frame 08) ao dar uma garrafa de leite ou ao
+## chegar comprada. Vaca andando termina o passo antes.
+func celebrate() -> void:
+    if sprite != null and state != State.WALK:
+        _enter(State.HAPPY)
+
 func get_frame_index() -> int:
     return frames.find(sprite.texture)
 
@@ -91,10 +100,19 @@ func _enter(new_state: State) -> void:
             _timer = 12.0
 
 func _pick_target() -> Vector3:
-    var best := Vector3(bounds.get_center().x, 0.0, bounds.get_center().y)
+    # Sem destino válido em 10 tentativas, fica onde está.
+    var best := Vector3(position.x, 0.0, position.z) if not avoid.is_empty() else Vector3(bounds.get_center().x, 0.0, bounds.get_center().y)
     for attempt in 10:
         var p := Vector3(_rng.randf_range(bounds.position.x, bounds.end.x), 0.0, _rng.randf_range(bounds.position.y, bounds.end.y))
         if Vector2(p.x - position.x, p.z - position.z).length() < 1.5:
+            continue
+        var blocked := false
+        for rect in avoid:
+            # O caminho reto também não corta a casinha/cocho.
+            if rect.has_point(Vector2(p.x, p.z)) or _segment_hits(rect, Vector2(position.x, position.z), Vector2(p.x, p.z)):
+                blocked = true
+                break
+        if blocked:
             continue
         var free := true
         for other in herd:
@@ -105,6 +123,12 @@ func _pick_target() -> Vector3:
         if free:
             break
     return best
+
+static func _segment_hits(rect: Rect2, a: Vector2, b: Vector2) -> bool:
+    for i in 9:
+        if rect.has_point(a.lerp(b, float(i) / 8.0)):
+            return true
+    return false
 
 func _process(delta: float) -> void:
     _anim_time += delta

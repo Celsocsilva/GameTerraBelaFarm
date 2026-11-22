@@ -15,7 +15,8 @@ signal harvested(cell_id: String, units: int)
 signal dropped(units: int)
 signal planted(cell_id: String)
 
-const FARMER_SCENE := preload("res://scenes/player/farmer.tscn")
+## Corpo-cápsula dos NPCs (era a cápsula do fazendeiro antes do modelo 3D, FARMER-GAME-001).
+const FARMER_SCENE := preload("res://scenes/npc/npc_capsule_body.tscn")
 const CRATE_FULL_TEXTURE := preload("res://assets/harvest/crate_full.png")
 const CRATE_EMPTY_TEXTURE := preload("res://assets/harvest/crate_empty.png")
 const PICKUP_FX_SCRIPT := preload("res://scripts/vfx/tomato_pickup_fx.gd")
@@ -170,7 +171,8 @@ func _choose_task() -> void:
         if not ripe.is_empty():
             _go_to_cell(ripe, TO_HARVEST)
             return
-    if HelperConfig.REPLANTS and carried == 0:
+    # FARM-005: só replanta quando não há fruto maduro em nenhum cultivo.
+    if HelperConfig.REPLANTS and carried == 0 and grid.can_sow():
         var empty := _find_nearest_cell("EMPTY")
         if not empty.is_empty():
             _go_to_cell(empty, TO_PLANT)

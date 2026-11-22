@@ -18,7 +18,7 @@ signal store_pressed()
 signal settings_pressed()
 
 const SALE_POPUP_SCENE := preload("res://scenes/ui/hud/components/SalePopup.tscn")
-const SHOP_MODAL_SCENE := preload("res://scenes/ui/shop/FarmShopModal.tscn")
+const SHOP_MODAL_SCENE := preload("res://scenes/ui/store/StoreScreen.tscn")
 ## Camada das modais (loja, configurações): acima do HUD (layer 1) e de tudo
 ## que é filho dele (joystick).
 const MODAL_LAYER := 50
@@ -59,7 +59,7 @@ var player_level: PlayerLevel
 var missions: MissionTracker
 var _banner_timer: SceneTreeTimer
 var _ui_scale := 1.0
-var shop_modal: FarmShopModal
+var shop_modal: StoreScreen
 var settings_modal: FarmSettingsModal
 var settings_button: SettingsButton
 var wallet_bar: HudWalletBar
@@ -93,16 +93,18 @@ func _ready() -> void:
     modal_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
     modal_layer.add_child(modal_root)
     modal_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-    shop_modal = SHOP_MODAL_SCENE.instantiate() as FarmShopModal
+    shop_modal = SHOP_MODAL_SCENE.instantiate() as StoreScreen
     modal_root.add_child(shop_modal)
     settings_modal = FarmSettingsModal.new()
     settings_modal.name = "FarmSettingsModal"
     modal_root.add_child(settings_modal)
+    settings_modal.language_changed.connect(func(_locale: String) -> void: shop_modal.refresh_language())
     reward_popup.collected.connect(_on_reward_collected)
     layout()
 
 func setup(p_wallet: Wallet, p_inventory: HarvestInventory, sales: SalesController, level: PlayerLevel, tracker: MissionTracker) -> void:
     wallet = p_wallet
+    shop_modal.setup(wallet)
     inventory = p_inventory
     player_level = level
     missions = tracker
@@ -194,6 +196,9 @@ func layout_for(area: Vector2) -> void:
     var wallet_size := HudWalletBar.DESIGN_SIZE * wallet_scale
     wallet_bar.position = Vector2(area.x - MARGIN - wallet_size.x, MARGIN + maxf(0.0, (level_size.y - wallet_size.y) * 0.5))
     var counters_bottom := wallet_bar.position.y + wallet_size.y
+    # FV-SHOP-003: a loja mostra a carteira no MESMO lugar e escala do HUD.
+    if shop_modal:
+        shop_modal.set_hud_wallet_rect(counters.position + wallet_bar.position, wallet_scale)
 
     info_banner.scale = Vector2.ONE * BANNER_SCALE * k
     var banner_size := info_banner.size * BANNER_SCALE * k

@@ -36,14 +36,20 @@ func _run() -> void:
     quit()
 
 func _check_map_expansion(world: FarmWorld) -> void:
-    var rect := world.get_map_rect()
+    # MAP-003: as duas expansões antigas (10% + 10%, direita e topo) continuam
+    # em get_previous_map_rect(); o mapa atual soma ~15% à esquerda, à direita
+    # e ao topo.
+    var rect := world.get_previous_map_rect()
+    var e := FarmWorld.MAP_SIDE_EXTENSION
+    var full := world.get_map_rect()
+    _check(full.is_equal_approx(rect.grow_individual(e, e, e, 0.0)), "MAP-003: mapa ampliado à esquerda, direita e topo")
     var extra := world.farm_size * FarmWorld.MAP_EXPANSION_RATIO
     _check(rect.position.is_equal_approx(Vector2(-world.farm_size * 0.5, -world.farm_size * 0.5 - extra)), "expansão deve ocorrer à direita e ao topo")
     _check(rect.size.is_equal_approx(Vector2.ONE * (world.farm_size + extra)), "mapa deve crescer 10% em cada eixo direcional")
     var ground := world.get_node("Ground/GrassSurface") as MeshInstance3D
     var ground_size := (ground.mesh as BoxMesh).size
-    _check(Vector2(ground_size.x, ground_size.z).is_equal_approx(rect.size), "malha do chão não acompanha os novos limites")
-    _check(Vector2(ground.position.x, ground.position.z).is_equal_approx(rect.get_center()), "chão não foi deslocado para o centro assimétrico")
+    _check(Vector2(ground_size.x, ground_size.z).is_equal_approx(full.size), "malha do chão não acompanha os novos limites")
+    _check(Vector2(ground.position.x, ground.position.z).is_equal_approx(full.get_center()), "chão não foi deslocado para o centro assimétrico")
     _check(is_equal_approx(rect.position.x, -32.0) and is_equal_approx(rect.end.y, 32.0), "esquerda e rodapé originais devem permanecer")
     _check(is_equal_approx(rect.end.x, world.farm_size * 0.5 + extra) and is_equal_approx(rect.position.y, -world.farm_size * 0.5 - extra), "direita/topo devem refletir as duas expansões de 10%")
     print("MAP_EXPANSION_OK rect=", rect, " center=", rect.get_center())

@@ -6,7 +6,8 @@ const ASSET_DIRS := {
     "res://assets/decor/farm_props": 16,
     "res://assets/decor/flowers": 6,
     "res://assets/decor/rocks": 3,
-    "res://assets/decor/trees": 4,
+    # MAP-003: + tree_round_leafy e tree_pine_tall (floresta das bordas novas).
+    "res://assets/decor/trees": 6,
     "res://assets/decor/vegetation": 6,
     "res://assets/terrain/grass": 4,
     "res://assets/terrain/patches": 6,
@@ -43,7 +44,7 @@ func _run() -> void:
     _check_seed(world)
     _check_regression(world)
     if failures == 0:
-        print("ENVIRONMENT_SMOKE_OK assets=45 placements=", world.cozy_environment.placements.size())
+        print("ENVIRONMENT_SMOKE_OK assets=47 placements=", world.cozy_environment.placements.size())
         quit(0)
     else:
         print("ENVIRONMENT_SMOKE_FAILED failures=", failures)
@@ -75,7 +76,7 @@ func _check_assets() -> void:
             else:
                 _check(image.get_pixel(0, 0).a < 1.0, "Sprite/patch corner lacks transparency: " + path)
         _check(png_count == int(ASSET_DIRS[directory]), "PNG count in %s: %d" % [directory, png_count])
-    _check(count == 45, "Expected 45 PNGs, found %d" % count)
+    _check(count == 47, "Expected 47 PNGs, found %d" % count)
     print("ENV_ASSETS checked=", count)
 
 func _check_seams(image: Image, path: String) -> void:

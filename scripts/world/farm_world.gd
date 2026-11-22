@@ -14,6 +14,12 @@ class_name FarmWorld
 ## As bordas esquerda/rodapé permanecem; todo o ganho vai para direita e norte.
 const MAP_EXPANSION_RATIO := 0.21
 const MAP_LATEST_INCREMENT := 7.04
+## MAP-003 (10/11, pedido do Celso): mais ~15% do mapa (77,44 m) para a
+## esquerda, para a direita e para o topo (11,6 m em cada lado). O rodapé
+## (balcão e clientes) não muda. As faixas novas recebem a floresta orgânica
+## de BorderForest; o rio foi esticado até a nova borda oeste.
+const MAP_SIDE_EXTENSION := 77.44 * 0.15
+const BORDER_FOREST_SCRIPT := preload("res://scripts/world/border_forest.gd")
 
 const JOYSTICK_SCENE := preload("res://scenes/ui/virtual_joystick.tscn")
 const SEED_THROW_SCENE := preload("res://scenes/vfx/SeedThrow.tscn")
@@ -57,7 +63,7 @@ const CROP_SIGN_SCRIPT := preload("res://scripts/farming/crop_sign.gd")
 ## FV-WOOD-001: plantações de eucalipto (corte, toras e venda no balcão).
 const EUCALYPTUS_GROVE_SCRIPT := preload("res://scripts/forestry/eucalyptus_grove.gd")
 ## Distância (m) entre as fileiras de eucalipto e a borda do terreno/rio.
-const EUCALYPTUS_EDGE_GAP := 1.9
+const EUCALYPTUS_EDGE_GAP := 3.2
 ## Espaço entre duas árvores da mesma fileira (centro a centro).
 const EUCALYPTUS_SPACING := 2.6
 ## Distância da fileira do rio à margem leste da água (margem ilustrada incluída).
@@ -95,6 +101,11 @@ const ORGANIC_PINE_EAST := [0.7, 0.6, 0.08, 0.4]
 const CROP_SIGN_OFFSET := Vector2(-0.9, 0.55)
 ## Plataforma de contratação: no chão, logo antes (lado do balcão, +Z) da parcela.
 const HELPER_PAD_GAP := 0.9
+## FARM-005: folga livre de árvores/props em volta dos canteiros (oeste/leste,
+## norte) e na frente (+Z); e em volta das parcelas de pilha.
+const CROP_CLEARANCE := Vector2(2.6, 2.6)
+const CROP_CLEARANCE_FRONT := 4.0
+const CROP_STOCK_CLEARANCE := 1.8
 
 ## FARM-003: casa do fazendeiro (arte do Celso) no lado esquerdo, antes do rio:
 ## entre a curva baixa do rio e o corredor central, ao sul do canteiro de tomate
@@ -120,9 +131,69 @@ const FARMHOUSE_BODY_FRONT_GAP := 0.9 * FARMHOUSE_SCALE
 ## sqrt(0,9)): era 15,5 x 11,0 m (170,5 m²), agora 14,70 x 10,44 m (153,5 m²),
 ## com o mesmo canto de trás à esquerda. O portão acompanha a proporção.
 const COW_PEN_AREA_SCALE := 0.9
-const COW_PEN_RECT := Rect2(-30.0, -41.0, 15.5 * sqrt(COW_PEN_AREA_SCALE), 11.0 * sqrt(COW_PEN_AREA_SCALE))
-const COW_PEN_GATE_X := -30.0 + 12.4 * sqrt(COW_PEN_AREA_SCALE)
+## DAIRY-002 (10/11): o curral ganhou a casinha de ordenha no canto leste e o
+## cocho na frente; ficou 3,5 m mais largo (leste) e 1,4 m mais fundo (norte;
+## os pinheiros de trás ainda cabem no mapa).
+## Era Rect2(-30, -41, 14,70, 10,44), portão em x -18,24.
+const COW_PEN_RECT := Rect2(-30.0, -42.4, 15.5 * sqrt(COW_PEN_AREA_SCALE) + 3.5, 11.0 * sqrt(COW_PEN_AREA_SCALE) + 1.4)
+const COW_PEN_GATE_X := -27.0
+## Casinha de ordenha (arte do Celso): largura na tela e fundo da pegada.
+## DAIRY-003: casinha 20% maior (era 5,4 x 3,2) no canto superior direito
+## (nordeste) do curral, de quem olha.
+const MILK_HOUSE_WIDTH := 5.4 * 1.2
+const MILK_HOUSE_DEPTH := 3.2 * 1.2
+const MILK_HOUSE_EAST_GAP := 0.4
+const MILK_HOUSE_NORTH_GAP := 0.5
+## Cocho (pilha de milho) dentro do curral, atrás da cerca da frente.
+const FEEDER_SIZE := Vector2(3.4, 1.6)
+## DAIRY-003: o milho é entregue encostando na cerca (sem piso); o cocho fica
+## dentro do curral, atrás da cerca da frente, a leste do portão.
+const FEEDER_OFFSET_X := 4.0
 const COW_PEN_SCRIPT := preload("res://scripts/world/cow_pen.gd")
+## DAIRY-001 (10/11): área do leite (pilha de caixas de garrafas) na frente do
+## portão do curral e, a oeste dela, a plataforma de compra de vacas. As duas
+## ficam na faixa de grama entre a cerca da frente e o rio.
+const MILK_STATION_SCRIPT := preload("res://scripts/dairy/milk_station.gd")
+const FEED_TROUGH_SCRIPT := preload("res://scripts/dairy/feed_trough.gd")
+## FARM-005: caminhos de terra e construções da biblioteca de assets.
+const FARM_PATHS_SCRIPT := preload("res://scripts/world/farm_paths.gd")
+const FARM_BUILDINGS_SCRIPT := preload("res://scripts/world/farm_buildings.gd")
+## Construções (cenário): [nome, arte, base XZ (frente, centro), largura (m)].
+## Em clareiras longe dos canteiros, pontes, rio e do fluxo do fazendeiro.
+const BUILDINGS := [
+    ["Barn", "res://assets/buildings/barn.png", Vector2(37.0, 7.0), 8.0],
+    ["Granary", "res://assets/buildings/granary.png", Vector2(42.5, -1.5), 6.4],
+    ["ChickenCoop", "res://assets/buildings/chicken_coop.png", Vector2(-33.5, -11.4), 6.0],
+    ["Workshop", "res://assets/buildings/industry/workshop.png", Vector2(41.0, -34.5), 7.2],
+    ["MachineShop", "res://assets/buildings/industry/machine_shop.png", Vector2(29.0, -36.0), 8.2],
+]
+## Caminhos de terra: [nome, largura (m), pontos XZ]. Ligam o balcão, a frente
+## dos canteiros, as plataformas, as pontes, a casa, o curral/leite e as
+## construções. Os pontos são suavizados (curvas orgânicas) pelo FarmPaths.
+const PATH_ROUTES := [
+    ["Balcao", 2.4, [Vector2(0.0, 18.8), Vector2(0.4, 15.2), Vector2(-0.3, 12.0), Vector2(0.0, 9.3)]],
+    ["FrenteTomate", 2.0, [Vector2(-9.6, 0.6), Vector2(-10.4, 4.6), Vector2(-9.9, 10.2), Vector2(-5.5, 11.6), Vector2(0.0, 11.9), Vector2(6.0, 11.6), Vector2(11.4, 11.0)]],
+    ["Centro", 2.0, [Vector2(0.0, -4.6), Vector2(0.3, -7.6), Vector2(0.0, -10.3)]],
+    ["Corredor", 2.2, [Vector2(-8.6, -10.2), Vector2(-4.0, -10.6), Vector2(0.0, -10.3), Vector2(6.0, -9.8), Vector2(11.0, -10.3), Vector2(17.0, -10.8), Vector2(23.0, -11.6), Vector2(30.0, -12.6), Vector2(36.0, -13.6), Vector2(38.5, -14.4)]],
+    ["Abobora", 2.0, [Vector2(1.0, -10.4), Vector2(-0.6, -13.2), Vector2(-2.2, -15.8)]],
+    ["AjudanteAbobora", 1.8, [Vector2(5.6, -10.0), Vector2(6.8, -12.8), Vector2(7.2, -15.4)]],
+    ["Milho", 2.0, [Vector2(24.6, -11.8), Vector2(26.6, -13.8), Vector2(27.6, -16.0)]],
+    ["Leite", 2.0, [Vector2(11.0, -10.3), Vector2(13.2, -17.0), Vector2(13.4, -24.0), Vector2(12.6, -29.5), Vector2(9.0, -33.2), Vector2(2.0, -34.3), Vector2(-4.0, -34.4), Vector2(-7.6, -35.0), Vector2(-9.1, -37.0)]],
+    ["Curral", 1.8, [Vector2(-6.0, -34.4), Vector2(-9.8, -32.6), Vector2(-11.0, -29.4), Vector2(-13.6, -27.6), Vector2(-16.9, -27.3), Vector2(-21.5, -27.4), Vector2(-25.4, -28.4), Vector2(-26.8, -29.8)]],
+    ["Celeiro", 2.0, [Vector2(11.4, 11.0), Vector2(17.0, 12.4), Vector2(24.0, 12.2), Vector2(31.0, 10.2), Vector2(36.4, 7.8)]],
+    ["Paiol", 1.8, [Vector2(37.5, 8.2), Vector2(41.6, 8.0), Vector2(42.6, 3.6), Vector2(42.6, -1.2)]],
+    ["Casa", 2.0, [Vector2(-17.2, 0.5), Vector2(-19.4, 1.0), Vector2(-21.0, 2.6), Vector2(-25.0, 3.0)]],
+    ["PonteMadeiraOeste", 1.8, [Vector2(-20.0, -10.2), Vector2(-19.6, -6.8), Vector2(-19.4, -2.6), Vector2(-19.8, 1.2)]],
+    ["Galinheiro", 1.8, [Vector2(-20.0, -10.2), Vector2(-21.6, -12.8), Vector2(-26.0, -13.7), Vector2(-29.4, -12.6), Vector2(-30.9, -10.3), Vector2(-33.0, -10.9)]],
+    ["Oficina", 2.0, [Vector2(38.5, -14.4), Vector2(42.6, -16.4), Vector2(43.2, -24.0), Vector2(42.4, -30.5), Vector2(41.2, -34.3)]],
+    ["Maquinas", 1.8, [Vector2(42.4, -30.5), Vector2(36.0, -32.6), Vector2(29.2, -35.9)]],
+]
+## Folga (m) entre a borda dos caminhos e árvores/props.
+const PATH_DECOR_MARGIN := 0.7
+const MILK_AREA_SIZE := Vector2(3.6, 3.9)
+## Distância da cerca da frente do curral até a área do leite / plataforma.
+const DAIRY_FENCE_GAP := 0.9
+const COW_SHOP_GAP := 1.0
 
 ## Mochila nas costas do fazendeiro (a frente do fazendeiro é -Z local).
 const BACKPACK_OFFSET := Vector3(0.0, 1.1, 0.62)
@@ -266,11 +337,22 @@ var eucalyptus_grove: EucalyptusGrove
 ## FARM-003: casa do fazendeiro e curral das vacas.
 var farmhouse: StaticBody3D
 var cow_pen: CowPen
+## DAIRY-001: leite das vacas e compra de vacas (plataforma + "contratação").
+var milk_station: MilkStation
+var feed_trough: FeedTrough
+var cow_shop: HelperHiring
+var cow_shop_pad: HelperPad
 var _wood_banner_shown := false
 ## Origem do punhado de sementes quando quem semeia é o ajudante.
 var _seed_origin_override: Variant = null
 
 func get_map_rect() -> Rect2:
+    var e := MAP_SIDE_EXTENSION
+    return get_previous_map_rect().grow_individual(e, e, e, 0.0)
+
+## Mapa antes do MAP-003 (-32..45,44 x -45,44..32): as faixas novas são o que
+## fica fora dele.
+func get_previous_map_rect() -> Rect2:
     var half := farm_size * 0.5
     var extra := farm_size * MAP_EXPANSION_RATIO
     return Rect2(Vector2(-half, -half - extra), Vector2(farm_size + extra, farm_size + extra))
@@ -294,16 +376,20 @@ func _ready() -> void:
     _build_obstacles()
     _build_river()
     _build_farmhouse()
+    _build_paths_and_buildings()
     _build_cow_pen()
     _build_camera()
     _build_harvest()
     _build_sales_counter()
     _build_helper()
+    _build_dairy()
     _build_eucalyptus()
+    _build_border_forest()
     _build_cozy_environment()
     _build_hud()
     _prewarm_seed_throw()
     _prewarm_crop_art()
+    _connect_farmer_animation()
     camera_focus = farmer.global_position
 
 func _process(delta: float) -> void:
@@ -327,6 +413,13 @@ func _process(delta: float) -> void:
                 (entry["pad"] as HelperPad).process_farmer_position(farmer.global_position, delta, harvest_inventory)
             if entry.has("pile"):
                 (entry["pile"] as TomatoPile).process_farmer_position(farmer.global_position, harvest_inventory, backpack.intake_marker)
+    if milk_station and farmer:
+        milk_station.pile.process_farmer_position(farmer.global_position, harvest_inventory, backpack.intake_marker)
+    # A plataforma "Vacas" também cobra milho: em cima dela, ela tem prioridade.
+    if feed_trough and farmer and not (cow_shop_pad and cow_shop_pad.contains_point(farmer.global_position)):
+        feed_trough.process_farmer_position(farmer.global_position, delta, harvest_inventory, backpack.intake_marker.global_position)
+    if cow_shop_pad and farmer:
+        cow_shop_pad.process_farmer_position(farmer.global_position, delta, harvest_inventory)
     if eucalyptus_grove and farmer:
         eucalyptus_grove.process_farmer_position(farmer.global_position, delta)
         _update_wood_hint()
@@ -344,6 +437,20 @@ func _build_river() -> void:
     river_system.name = "RiverSystem"
     add_child(river_system)
 
+## MAP-003: árvores novas (copa redonda e pinheiro alto, artes do Celso) nas
+## faixas ampliadas do mapa, em disposição orgânica.
+var border_forest: BorderForest
+var farm_paths: FarmPaths
+var farm_buildings: FarmBuildings
+
+func _build_border_forest() -> void:
+    border_forest = BORDER_FOREST_SCRIPT.new() as BorderForest
+    border_forest.name = "BorderForest"
+    add_child(border_forest)
+    var blocked: Array[Rect2] = get_obstacle_rects()
+    blocked.append_array(get_path_block_rects())
+    border_forest.setup(get_map_rect(), get_previous_map_rect(), river_system, blocked)
+
 func _build_cozy_environment() -> void:
     cozy_environment = COZY_ENVIRONMENT_SCRIPT.new() as CozyEnvironment
     cozy_environment.name = "CozyEnvironment"
@@ -351,9 +458,13 @@ func _build_cozy_environment() -> void:
         cozy_environment.reserved_areas.append(river_system)
     for rect in get_obstacle_rects():
         cozy_environment.blocked_rects.append(rect)
+    cozy_environment.blocked_rects.append_array(get_path_block_rects())
     if eucalyptus_grove:
         for tree in eucalyptus_grove.trees:
             cozy_environment.blocked_rects.append(Rect2(Vector2(tree.position.x, tree.position.z) - Vector2(1.3, 1.0), Vector2(2.6, 2.0)))
+    if border_forest:
+        for point in border_forest.points:
+            cozy_environment.blocked_rects.append(Rect2(Vector2(point.x, point.z) - Vector2(1.3, 1.0), Vector2(2.6, 2.0)))
     add_child(cozy_environment)
     cozy_environment.setup(
         $Ground/GrassSurface as MeshInstance3D,
@@ -370,6 +481,8 @@ func _build_sales_counter() -> void:
     sales_counter = SALES_COUNTER_SCRIPT.new() as SalesCounter
     sales_counter.name = "SalesCounter"
     add_child(sales_counter)
+    # MAP-003: as cercas do balcão vão até as bordas do mapa ampliado.
+    sales_counter.side_limits = Vector2(get_map_rect().position.x, get_map_rect().end.x)
     sales_counter.place_at_map_foot(farm_size)
     sales_counter.setup(harvest_inventory)
     customer_queue = CUSTOMER_QUEUE_SCRIPT.new() as CustomerQueue
@@ -438,18 +551,38 @@ func get_obstacle_rects() -> Array[Rect2]:
     rects.append(get_farmhouse_rect().grow_individual(0.8, 4.5, 0.8, 0.0))
     # PEN-002: o curral e os pinheiros/arbustos em volta dele.
     rects.append(CowPen.get_surroundings_rect(COW_PEN_RECT))
+    rects.append(get_milk_area_rect().grow(1.0))
+    rects.append(get_cow_shop_pad_rect().grow(0.8))
     rects.append(get_helper_pad_rect().grow(0.8))
     # ENV-FENCE-001: faixa das cercas do balcão (a arte sobe na tela; arbustos
     # logo atrás dela ficavam cobertos pela cerca).
     if sales_counter:
         rects.append(Rect2(-farm_size * 0.5, sales_counter.position.z - 1.8, farm_size, 2.4))
+    # FARM-005: construções (a arte em pé e um pouco de gramado em volta).
+    # Na frente (+Z) a folga é maior: árvore ali cobriria a fachada na tela.
+    if farm_buildings:
+        for art in farm_buildings.get_art_rects():
+            rects.append(art.grow_individual(1.2, 1.2, 1.2, 3.2))
+    # FARM-005: folga maior em volta das áreas de cultivo (nada invade nem fica
+    # colado). Na frente (+Z, lado da câmera) a folga é maior porque a copa de
+    # uma árvore ali sobe na tela por cima do canteiro.
+    for field in get_crop_field_rects():
+        rects.append(field.grow_individual(CROP_CLEARANCE.x, CROP_CLEARANCE.y, CROP_CLEARANCE.x, CROP_CLEARANCE_FRONT))
+    rects.append(get_extra_plot_rect().grow_individual(CROP_STOCK_CLEARANCE, CROP_STOCK_CLEARANCE, CROP_STOCK_CLEARANCE, CROP_CLEARANCE_FRONT))
     for entry in crop_areas:
-        rects.append((entry["field"] as Rect2).grow(1.0))
-        rects.append((entry["stock"] as Rect2).grow(1.0))
-        rects.append((entry["pad_rect"] as Rect2).grow(0.8))
+        rects.append((entry["stock"] as Rect2).grow_individual(CROP_STOCK_CLEARANCE, CROP_STOCK_CLEARANCE, CROP_STOCK_CLEARANCE, CROP_CLEARANCE_FRONT))
+        rects.append((entry["pad_rect"] as Rect2).grow_individual(1.5, 1.5, 1.5, 2.5))
+    rects.append(get_helper_pad_rect().grow_individual(1.5, 1.5, 1.5, 2.5))
     for sign in crop_signs:
-        rects.append(Rect2(Vector2(sign.position.x, sign.position.z) - Vector2(1.3, 0.6), Vector2(2.6, 1.2)))
+        rects.append(Rect2(Vector2(sign.position.x, sign.position.z) - Vector2(1.8, 1.0), Vector2(3.6, 3.0)))
     return rects
+
+## FARM-005: canteiros plantáveis (tomate + culturas extras), XZ do mundo.
+func get_crop_field_rects() -> Array[Rect2]:
+    var result: Array[Rect2] = [get_planting_area_rect()]
+    for entry in crop_areas:
+        result.append(entry["field"] as Rect2)
+    return result
 
 ## Parcela extra: 2 tiras com a mesma arte de solo (escala uniforme), 10% da
 ## área do canteiro. Sem Area3D: não entra no PlantingGrid.
@@ -767,6 +900,9 @@ func _eucalyptus_allowed(point: Vector2) -> bool:
             return false
     if river_system and river_system.blocks_decoration(Vector3(point.x, 0.0, point.y), 0.6):
         return false
+    # FARM-005: nada em cima (ou colado) dos caminhos.
+    if farm_paths and farm_paths.is_near(point, PATH_DECOR_MARGIN + 0.4):
+        return false
     return true
 
 func _build_eucalyptus() -> void:
@@ -897,6 +1033,48 @@ func _build_planting_grid() -> void:
         grid.cell_planted.connect(_on_grid_cell_planted)
         crop_grids[crop] = grid
         entry["grid"] = grid
+    for grid in get_all_grids():
+        grid.sow_gate = can_sow
+        grid.cell_state_changed.connect(_on_sow_cell_state)
+
+## FARM-005: todas as grades de plantio (tomate + culturas extras).
+func get_all_grids() -> Array[PlantingGrid]:
+    var result: Array[PlantingGrid] = []
+    if planting_grid:
+        result.append(planting_grid)
+    for grid in crop_grids.values():
+        result.append(grid as PlantingGrid)
+    return result
+
+## FARM-006: ciclo da semeadura. false = plantando (pode semear todo o
+## terreno); true = colhendo (começou a colheita em algum cultivo; ninguém
+## semeia até colher tudo o que foi plantado, em todos os cultivos).
+var harvest_phase := false
+
+## FARM-005/006: pode semear agora?
+func can_sow() -> bool:
+    if not harvest_phase:
+        return true
+    _update_sow_phase()
+    return not harvest_phase
+
+## Fecha o ciclo de colheita quando nada plantado ficou por colher: as covas
+## colhidas de todos os cultivos reabrem e a semeadura volta.
+func _update_sow_phase() -> void:
+    if not harvest_phase:
+        return
+    for grid in get_all_grids():
+        if grid.has_pending_crop():
+            return
+    harvest_phase = false
+    for grid in get_all_grids():
+        grid.reopen_harvested()
+
+func _on_sow_cell_state(_cell_id: String, state: String) -> void:
+    if state == PlantingGrid.STATE_HARVESTING:
+        harvest_phase = true
+    elif state == PlantingGrid.STATE_HARVESTED:
+        call_deferred("_update_sow_phase")
 
 ## Grade (tomate ou cultura extra) dona da cova `cell_id`.
 func get_grid_for_cell(cell_id: String) -> PlantingGrid:
@@ -911,7 +1089,35 @@ func get_grid_for_cell(cell_id: String) -> PlantingGrid:
 func get_crop_grid(crop: StringName) -> PlantingGrid:
     return planting_grid if crop == &"tomato" else crop_grids.get(crop) as PlantingGrid
 
+## FARMER-GAME-001: liga os eventos do jogo às animações do fazendeiro 3D.
+## Semear (cada passo no canteiro), colher, mochila com caixas (mãos nas alças),
+## entregar no balcão / cocho / plataformas e cortar eucalipto.
+func _connect_farmer_animation() -> void:
+    if farmer == null or farmer.animator == null:
+        return
+    var anim := farmer.animator
+    harvest_inventory.amount_changed.connect(func(_item: StringName, _amount: int) -> void:
+        anim.carrying_backpack = harvest_inventory.get_total() > 0)
+    anim.carrying_backpack = harvest_inventory.get_total() > 0
+    var harvesters: Array = [harvest_controller]
+    harvesters.append_array(crop_harvesters.values())
+    for controller in harvesters:
+        (controller as HarvestController).harvest_started.connect(func(_cell: String, _units: int) -> void: anim.play_harvest())
+    sales_counter.deposited.connect(func(_units: int, _total: int) -> void: anim.play_deliver())
+    sales_counter.item_deposited.connect(func(_item: StringName, _units: int, _total: int) -> void: anim.play_deliver())
+    feed_trough.corn_delivered.connect(func(_units: int, _total: int) -> void: anim.play_deliver())
+    eucalyptus_grove.tree_felled.connect(func(_tree: EucalyptusTree, _logs: int) -> void: anim.play_deliver())
+    var pads: Array = [helper_pad, cow_shop_pad]
+    for entry in crop_areas:
+        if entry.has("pad"):
+            pads.append(entry["pad"])
+    for pad in pads:
+        if pad:
+            (pad as HelperPad).material_delivered.connect(func(_units: int, _total: int) -> void: anim.play_deliver())
+
 func _on_grid_cell_planted(cell_id: String) -> void:
+    if not (_seed_origin_override is Vector3) and farmer and farmer.animator:
+        farmer.animator.play_sow()
     var cell: Dictionary = get_grid_for_cell(cell_id).cells[cell_id]
     var seed_throw := SEED_THROW_SCENE.instantiate() as SeedThrow
     add_child(seed_throw)
@@ -1210,11 +1416,106 @@ func _build_farmhouse() -> void:
     collision.position = Vector3(body.get_center().x - FARMHOUSE_BASE.x, 1.2, body.get_center().y - FARMHOUSE_BASE.y)
     farmhouse.add_child(collision)
 
+## FARM-005: caminhos de terra e construções (antes da vegetação, que os evita).
+func _build_paths_and_buildings() -> void:
+    farm_paths = FARM_PATHS_SCRIPT.new() as FarmPaths
+    farm_paths.name = "FarmPaths"
+    add_child(farm_paths)
+    var routes: Array = []
+    for route in PATH_ROUTES:
+        routes.append({"name": route[0], "width": route[1], "points": PackedVector2Array(route[2])})
+    farm_paths.setup(routes)
+    farm_buildings = FARM_BUILDINGS_SCRIPT.new() as FarmBuildings
+    farm_buildings.name = "FarmBuildings"
+    add_child(farm_buildings)
+    farm_buildings.setup(BUILDINGS)
+
+## FARM-005: retângulos dos caminhos (com folga) para quem evita retângulos.
+func get_path_block_rects() -> Array[Rect2]:
+    return farm_paths.get_block_rects(PATH_DECOR_MARGIN) if farm_paths else ([] as Array[Rect2])
+
 func _build_cow_pen() -> void:
     cow_pen = COW_PEN_SCRIPT.new() as CowPen
     cow_pen.name = "CowPen"
     add_child(cow_pen)
+    cow_pen.keep_clear = [get_milk_area_rect().grow(0.4), get_cow_shop_pad_rect().grow(0.4)]
+    # Em volta do curral a faixa é estreita (cerca/rio): folga menor dos caminhos.
+    if farm_paths:
+        cow_pen.keep_clear.append_array(farm_paths.get_block_rects(0.1))
+    cow_pen.initial_cows = DairyConfig.INITIAL_COWS
+    cow_pen.house_rect = get_milk_house_rect()
+    cow_pen.feeder_rect = get_feeder_rect()
     cow_pen.setup(COW_PEN_RECT, COW_PEN_GATE_X)
+
+## DAIRY-003: casinha de ordenha no canto superior direito (nordeste) do curral.
+func get_milk_house_rect() -> Rect2:
+    var end_x := COW_PEN_RECT.end.x - MILK_HOUSE_EAST_GAP
+    return Rect2(end_x - MILK_HOUSE_WIDTH, COW_PEN_RECT.position.y + MILK_HOUSE_NORTH_GAP, MILK_HOUSE_WIDTH, MILK_HOUSE_DEPTH)
+
+## DAIRY-003: área do leite do lado de fora da cerca leste, ao lado da casinha.
+func get_milk_area_rect() -> Rect2:
+    var house := get_milk_house_rect()
+    var center := Vector2(COW_PEN_RECT.end.x + DAIRY_FENCE_GAP + MILK_AREA_SIZE.x * 0.5, house.get_center().y + 0.3)
+    return Rect2(center - MILK_AREA_SIZE * 0.5, MILK_AREA_SIZE)
+
+## DAIRY-003: o cocho (pilha de milho) dentro do curral, atrás da cerca da frente.
+func get_feeder_rect() -> Rect2:
+    var center := Vector2(COW_PEN_GATE_X + FEEDER_OFFSET_X + FEEDER_SIZE.x * 0.5, COW_PEN_RECT.end.y - 0.35 - FEEDER_SIZE.y * 0.5)
+    return Rect2(center - FEEDER_SIZE * 0.5, FEEDER_SIZE)
+
+## Plataforma "Vacas", do lado de fora da cerca da frente, a leste do cocho.
+func get_cow_shop_pad_rect() -> Rect2:
+    var feeder := get_feeder_rect()
+    var size := HelperPad.get_size()
+    var center := Vector2(feeder.end.x + COW_SHOP_GAP + size.x * 0.5, COW_PEN_RECT.end.y + DAIRY_FENCE_GAP + size.y * 0.5)
+    return Rect2(center - size * 0.5, size)
+
+## DAIRY-001: as vacas dão garrafas de leite para a área do leite; a
+## plataforma vende vacas (DairyConfig.COW_PRICE + 20 caixas de milho cada,
+## descarregadas da mochila como na contratação do ajudante).
+func _build_dairy() -> void:
+    feed_trough = FEED_TROUGH_SCRIPT.new() as FeedTrough
+    feed_trough.name = "FeedTrough"
+    add_child(feed_trough)
+    feed_trough.setup(COW_PEN_RECT, get_feeder_rect(), harvest_inventory.units_per_crate)
+    milk_station = MILK_STATION_SCRIPT.new() as MilkStation
+    milk_station.name = "MilkStation"
+    add_child(milk_station)
+    milk_station.setup(get_milk_area_rect(), cow_pen, harvest_inventory.units_per_crate, feed_trough)
+    cow_shop = HELPER_HIRING_SCRIPT.new() as HelperHiring
+    cow_shop.name = "CowShop"
+    cow_shop.fixed_cost = DairyConfig.COW_PRICE
+    cow_shop.max_grade = DairyConfig.MAX_EXTRA_COWS
+    cow_shop.requirement_every_grade = true
+    add_child(cow_shop)
+    cow_shop.configure_initial_requirement(DairyConfig.COW_CORN_ITEM, DairyConfig.COW_CORN_CRATES, harvest_inventory.units_per_crate, null)
+    cow_shop_pad = HELPER_PAD_SCRIPT.new() as HelperPad
+    cow_shop_pad.name = "CowShopPad"
+    cow_shop_pad.title_key = "COW_SHOP_TITLE"
+    cow_shop_pad.grade_key = "COW_SHOP_COUNT"
+    cow_shop_pad.grade_offset = cow_pen.get_cow_count()
+    add_child(cow_shop_pad)
+    cow_shop_pad.setup(get_cow_shop_pad_rect().get_center(), cow_shop, wallet)
+    cow_shop.grade_changed.connect(_on_cow_bought)
+
+## DAIRY-002: aviso de cocho vazio, só com o fazendeiro perto do curral e no
+## máximo uma vez a cada 30 s.
+var _hungry_banner_at := -1000.0
+
+func _on_cows_hungry() -> void:
+    if hud == null or farmer == null:
+        return
+    var now := Time.get_ticks_msec() / 1000.0
+    if now - _hungry_banner_at < 30.0:
+        return
+    if CowPen.get_surroundings_rect(COW_PEN_RECT).grow(4.0).has_point(Vector2(farmer.global_position.x, farmer.global_position.z)):
+        _hungry_banner_at = now
+        hud.show_banner("COWS_HUNGRY", 2.6)
+
+func _on_cow_bought(_grade: int) -> void:
+    cow_pen.add_cow()
+    if hud:
+        hud.show_banner("COW_BOUGHT", 2.4, [cow_pen.get_cow_count()])
 
 ## FV-POLISH-001: só a cerca (com arte). O galpão (caixa vermelha) e a árvore
 ## primitiva (cilindro + esfera sem textura) foram removidos.
@@ -1306,6 +1607,9 @@ func _build_hud() -> void:
     eucalyptus_grove.season_changed.connect(func(season: StringName) -> void: hud.show_banner("SEASON_CHANGED", 2.4, [String(SeasonClock.label_key(season))]))
     helper_pad.out_of_money.connect(func(missing: int) -> void: hud.show_banner("HELPER_NO_MONEY", 2.0, [missing]))
     helper_pad.out_of_material.connect(_on_helper_material_missing)
+    cow_shop_pad.out_of_money.connect(func(missing: int) -> void: hud.show_banner("COW_NO_MONEY", 2.0, [missing]))
+    cow_shop_pad.out_of_material.connect(_on_helper_material_missing)
+    milk_station.hungry.connect(_on_cows_hungry)
     for entry in crop_areas:
         var crop_key := String(CropSign.CROPS[entry["crop"]]["key"]) if CropSign.has_crop(entry["crop"]) else String(entry["crop"])
         var pad := entry["pad"] as HelperPad

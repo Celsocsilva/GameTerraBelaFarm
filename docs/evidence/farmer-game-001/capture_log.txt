@@ -1,0 +1,11 @@
+01-correndo-no-caminho: loco=run action=Interact busy=false speed=4.00
+01b-parado-idle: loco=idle action=Interact busy=false speed=0.00
+02-semeando-no-canteiro: loco=run action=Interact busy=true speed=4.00
+02: covas semeadas=10
+03-colhendo-tomates: loco=idle action=PickUp_Table busy=false speed=0.00
+03b-colhendo-parado: loco=bp_idle action=PickUp_Table busy=false speed=0.00
+03: tomates na mochila=12
+04-mochila-indo-ao-balcao: loco=bp_run action= busy=false speed=4.00
+04b-entregando-no-balcao: loco=idle action=Interact busy=true speed=0.00
+04: entregue=true mochila=0
+05-curral-com-milho: loco=bp_run action=Interact busy=false speed=4.00

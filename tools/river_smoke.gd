@@ -82,7 +82,8 @@ func _test_continuity() -> void:
     _check(dry == 0, "Centerline outside water at %d/%d samples" % [dry, samples])
     var first: Dictionary = river.segments[0]
     var last: Dictionary = river.segments[river.segments.size() - 1]
-    var edge := world.farm_size * 0.5
+    # MAP-003: o rio entra e sai pela borda oeste do mapa ampliado.
+    var edge := -world.get_map_rect().position.x
     _check(absf(absf((first["entry_point"] as Vector3).x) - edge) < 0.05, "River does not start at the map edge")
     _check(absf(absf((last["exit_point"] as Vector3).x) - edge) < 0.05, "River does not end at the map edge")
     print("RIVER_A_CONTINUITY segments=", river.segments.size(), " junctions=", river.segments.size() - 1,

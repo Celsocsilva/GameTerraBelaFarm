@@ -11,6 +11,10 @@ const CRATE_EMPTY := preload("res://assets/harvest/crate_empty.png")
 const CRATE_CORN_FULL := preload("res://assets/harvest/crate_corn_full.png")
 ## A colheita de abóbora usa o próprio grupo maduro, sem caixa de tomate.
 const PUMPKIN_FULL := preload("res://assets/crops/pumpkin/stages/pumpkin_stage_04_ripe.png")
+## DAIRY-001: caixa com 7 garrafas de leite (tools/art/gen_milk_crate.py, da
+## arte assets/resources/milk-bottom.png) e a garrafa sozinha (voo vaca -> pilha).
+const CRATE_MILK_FULL := preload("res://assets/harvest/crate_milk_full.png")
+const MILK_BOTTLE := preload("res://assets/harvest/milk_bottle.png")
 const LOG_BUNDLE_4 := preload("res://assets/items/logs/log_bundle_4.png")
 const LOG_BUNDLE_6 := preload("res://assets/items/logs/log_bundle_6.png")
 const LOG_BUNDLE_8 := preload("res://assets/items/logs/log_bundle_8.png")
@@ -23,13 +27,15 @@ static func full_texture(item: StringName) -> Texture2D:
         return CRATE_CORN_FULL
     if item == &"pumpkin":
         return PUMPKIN_FULL
+    if item == &"milk":
+        return CRATE_MILK_FULL
     return LOG_BUNDLE_8 if item == &"wood" else CRATE_FULL
 
 ## Arte do caixote incompleto com `units` unidades (de `per_crate`).
 static func partial_texture(item: StringName, units: int, per_crate: int) -> Texture2D:
     # Milho ainda não possui uma arte parcial própria. Manter a caixa de milho
     # evita alternância visível para a caixa vazia de tomate durante movimento.
-    if item in [&"corn", &"pumpkin"]:
+    if item in [&"corn", &"pumpkin", &"milk"]:
         return full_texture(item)
     if item != &"wood":
         return CRATE_EMPTY

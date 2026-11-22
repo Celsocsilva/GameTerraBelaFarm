@@ -52,8 +52,10 @@ const BARRIER_HEIGHT := 0.7
 ## vendido no balcão. O milho ocupa a vaga da esquerda reservada a ele em
 ## CrateStack; a madeira passou para a vaga da direita (da abóbora, que ainda
 ## não é vendida).
-## Quatro vagas horizontais: milho, tomate, abóbora e madeira.
-const ITEM_SLOT_X := {&"corn": -4.0, &"tomato": -1.35, &"pumpkin": 1.35, &"wood": 4.0}
+## Vagas horizontais: milho, tomate, abóbora, leite e madeira.
+## DAIRY-001: 5 vagas (o leite entrou entre a abóbora e a madeira); 2,2 m entre
+## centros ainda passa a largura de uma caixa (1,69 m).
+const ITEM_SLOT_X := {&"corn": -4.4, &"tomato": -2.2, &"pumpkin": 0.0, &"milk": 2.2, &"wood": 4.4}
 ## Arte da banca de feira plana (toalha xadrez vermelha) — FV-STACK-001.
 const STALL_TEXTURE := preload("res://assets/sales/stall_market_gingham.png")
 ## Largura da arte na cena: a mesma do balcão (a colisão não muda).
@@ -74,7 +76,7 @@ const VIEW_PITCH_DEGREES := 45.0
 @export var build_side_barriers: bool = true
 ## FV-WOOD-001: outros itens que o fazendeiro descarrega aqui, cada um na sua
 ## pilha (TomatoPile reaproveitada, com a arte de ItemArt).
-@export var extra_items: Array[StringName] = [&"corn", &"pumpkin", &"wood"]
+@export var extra_items: Array[StringName] = [&"corn", &"pumpkin", &"milk", &"wood"]
 
 ## Registro para testes: um item por caixa que pulou {"index", "from", "to"}.
 var jump_log: Array[Dictionary] = []
@@ -83,6 +85,9 @@ var _displayed_crates := 0
 var _stored_total := 0
 var _inventory: HarvestInventory
 var _farm_size := 0.0
+## MAP-003: X (mundo) das bordas esquerda/direita do mapa; Vector2.ZERO = usa
+## ±farm_size/2 como antes.
+var side_limits := Vector2.ZERO
 var _body: StaticBody3D
 var _camera: Camera3D
 ## Caixas ainda no ar (vaga visual -> quantas a caminho): só aparecem ao pousar.
@@ -458,10 +463,13 @@ func _orient_sprites() -> void:
 ## linha central do balcão. Os clientes não têm física e não são afetados.
 func _build_barriers() -> void:
     var half := get_half_extents()
-    var span := _farm_size * 0.5 - half.x
-    if span <= 0.05:
-        return
     for side in [-1.0, 1.0]:
+        var edge := _farm_size * 0.5
+        if side_limits != Vector2.ZERO:
+            edge = absf(side_limits.x if side < 0.0 else side_limits.y) - side * position.x
+        var span := edge - half.x
+        if span <= 0.05:
+            continue
         var barrier := StaticBody3D.new()
         barrier.name = "CounterBarrier_%s" % ("L" if side < 0.0 else "R")
         barrier.position = Vector3(side * (half.x + span * 0.5), 0.0, 0.0)

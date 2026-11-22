@@ -79,13 +79,16 @@ func _test_placement(world: FarmWorld, grove: EucalyptusGrove) -> void:
         _check(not world.river_system.is_point_in_water(tree.position, 0.3), "%s dentro do rio" % tree.name)
         for field in fields:
             _check(not field.has_point(p), "%s dentro de um canteiro" % tree.name)
-            if field.grow(2.6).has_point(p):
+            # FARM-005: fileiras a ~3,2 m da borda, nunca coladas no canteiro.
+            _check(not field.grow_individual(FarmWorld.CROP_CLEARANCE.x, FarmWorld.CROP_CLEARANCE.y, FarmWorld.CROP_CLEARANCE.x, FarmWorld.CROP_CLEARANCE_FRONT).has_point(p), "%s colada no canteiro" % tree.name)
+            if field.grow(4.4).has_point(p):
                 near_field += 1
         if world.river_system.blocks_decoration(tree.position, 3.0):
             near_river += 1
         _check(tree.get_node_or_null("Art") is Sprite3D, "%s sem sprite" % tree.name)
         _check(tree.find_children("*", "CollisionShape3D").is_empty(), "%s não deveria fechar a passagem" % tree.name)
-    _check(near_field >= 8, "poucas árvores nas bordas dos canteiros: %d" % near_field)
+    # FARM-005: menos fileiras junto aos canteiros (folga e caminhos).
+    _check(near_field >= 4, "poucas árvores nas bordas dos canteiros: %d" % near_field)
     # FV-WOOD-002: floresta no canto sudoeste, ao sul do rio, dos dois lados da cerca do balcão.
     var forest := 0
     var below_fence := 0

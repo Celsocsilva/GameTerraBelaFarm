@@ -26,6 +26,12 @@ var requirement_units_per_crate := 8
 var requirement_source: Object
 ## Unidades do material já descarregadas na plataforma (persistem ao sair).
 var material_units := 0
+## DAIRY-001: a mesma plataforma vende vacas. Preço fixo por "grau" (>= 0
+## substitui a tabela do HelperConfig), teto próprio e material cobrado em
+## TODA compra (não só na contratação inicial).
+var fixed_cost := -1
+var max_grade := HelperConfig.MAX_GRADE
+var requirement_every_grade := false
 
 signal paid_changed(paid: int, cost: int)
 
@@ -33,10 +39,16 @@ func is_hired() -> bool:
     return grade > 0
 
 func is_max() -> bool:
-    return grade >= HelperConfig.MAX_GRADE
+    return grade >= max_grade
 
 func get_next_cost() -> int:
-    return HelperConfig.next_cost(grade)
+    if is_max():
+        return -1
+    return fixed_cost if fixed_cost >= 0 else HelperConfig.next_cost(grade)
+
+## A próxima compra exige o material (fardos/caixas) descarregado na plataforma?
+func requires_material() -> bool:
+    return requirement_crates > 0 and not is_max() and (grade == 0 or requirement_every_grade)
 
 func configure_initial_requirement(item: StringName, crates: int, units_per_crate: int, source: Object) -> void:
     requirement_item = item
@@ -45,10 +57,10 @@ func configure_initial_requirement(item: StringName, crates: int, units_per_crat
     requirement_source = source
 
 func get_requirement_crates() -> int:
-    return requirement_crates if grade == 0 else 0
+    return requirement_crates if requires_material() else 0
 
 func get_available_requirement_crates() -> int:
-    if grade > 0 or requirement_crates <= 0:
+    if not requires_material():
         return requirement_crates
     return mini(requirement_crates, material_units / requirement_units_per_crate)
 
@@ -62,13 +74,13 @@ func get_requirement_units() -> int:
     return get_requirement_crates() * requirement_units_per_crate
 
 func get_missing_requirement_units() -> int:
-    return maxi(0, get_requirement_units() - material_units) if grade == 0 else 0
+    return maxi(0, get_requirement_units() - material_units) if requires_material() else 0
 
 ## Descarrega até `max_units` do material da mochila (`inventory`) para a
 ## contratação. Retorna quantas unidades saíram da mochila (nunca mais que o
 ## que falta, nunca mais do que o fazendeiro carrega).
 func deliver_material(inventory: HarvestInventory, max_units: int) -> int:
-    if inventory == null or grade > 0 or requirement_crates <= 0:
+    if inventory == null or not requires_material():
         return 0
     var units := mini(mini(maxi(max_units, 0), get_missing_requirement_units()), inventory.get_amount(requirement_item))
     if units <= 0:
@@ -83,13 +95,14 @@ func deliver_material(inventory: HarvestInventory, max_units: int) -> int:
     return removed
 
 func _consume_initial_requirement() -> bool:
-    if grade > 0 or requirement_crates <= 0:
+    if not requires_material():
         return true
     var missing := get_missing_requirement_crates()
     if missing > 0:
         requirement_failed.emit(requirement_item, missing)
         return false
     material_units = 0
+    material_changed.emit(material_units, get_requirement_units())
     return true
 
 func can_buy(wallet: Wallet) -> bool:
@@ -101,7 +114,7 @@ func try_buy(wallet: Wallet) -> bool:
     if wallet == null or is_max():
         return false
     var cost := get_remaining_cost()
-    if grade == 0 and not has_initial_requirement():
+    if requires_material() and not has_initial_requirement():
         requirement_failed.emit(requirement_item, get_missing_requirement_crates())
         return false
     if not wallet.spend(cost, &"helper"):
@@ -128,7 +141,7 @@ func pay(wallet: Wallet, amount: int = 1) -> int:
     var units := mini(mini(maxi(amount, 0), remaining), wallet.get_balance())
     # Sem o material, a plataforma pode guardar no máximo 99/100 dinheiros.
     # Assim a graduação nunca é liberada e o último dinheiro não é consumido.
-    if grade == 0 and units >= remaining and not has_initial_requirement():
+    if requires_material() and units >= remaining and not has_initial_requirement():
         units = maxi(0, remaining - 1)
         requirement_failed.emit(requirement_item, get_missing_requirement_crates())
     if units <= 0 or not wallet.spend(units, &"helper"):
@@ -149,7 +162,7 @@ func pay(wallet: Wallet, amount: int = 1) -> int:
 
 ## Restauração de save / testes.
 func set_grade(value: int) -> void:
-    var target := HelperConfig.clamp_grade(value)
+    var target := clampi(value, 0, max_grade)
     if target == grade:
         return
     grade = target
