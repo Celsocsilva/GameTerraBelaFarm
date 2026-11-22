@@ -120,10 +120,11 @@ func _run() -> void:
         return _fail("cliente de trás não chegou ao primeiro lugar")
     print("QUEUE_ADVANCES_OK")
 
-    # 3. Clones do fazendeiro com cores alternativas.
+    # 3. Clones do corpo-cápsula (o fazendeiro virou modelo 3D em FARMER-GAME-001) com cores alternativas.
     var farmer_meshes := 0
     var farmer_color := Color()
-    for child in world.farmer.get_children():
+    var template := Customer.FARMER_SCENE.instantiate()
+    for child in template.get_children():
         if child is MeshInstance3D:
             farmer_meshes += 1
             if child.name == "Body":
@@ -136,7 +137,7 @@ func _run() -> void:
         if meshes.size() != farmer_meshes:
             return _fail("cliente com %d meshes, fazendeiro %d" % [meshes.size(), farmer_meshes])
         var body := customer.get_node("Body") as MeshInstance3D
-        var source := world.farmer.get_node("Body") as MeshInstance3D
+        var source := template.get_node("Body") as MeshInstance3D
         if body.mesh != source.mesh:
             return _fail("cliente não usa o mesh do fazendeiro")
         var color := (body.material_override as StandardMaterial3D).albedo_color
@@ -144,6 +145,7 @@ func _run() -> void:
             return _fail("cliente com a cor do fazendeiro")
         if customer.get_script() != Customer or (customer as Node) is CharacterBody3D:
             return _fail("cliente com controle do fazendeiro")
+    template.free()
     var schemes := {}
     for customer in customers:
         schemes[customer.color_scheme_index] = true

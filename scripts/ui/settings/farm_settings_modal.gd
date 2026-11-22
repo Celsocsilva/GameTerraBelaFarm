@@ -7,6 +7,7 @@ class_name FarmSettingsModal
 ## fundo escurecido bloqueia os toques no jogo enquanto está aberta.
 
 signal closed
+signal language_changed(locale: String)
 
 const WOOD := Color("#86502b")
 const WOOD_DARK := Color("#60371f")
@@ -56,6 +57,7 @@ func get_card_rect() -> Rect2:
 func choose_language(locale: String) -> void:
     FarmSettings.set_locale(locale)
     _refresh()
+    language_changed.emit(locale)
 
 func toggle_sound() -> void:
     FarmSettings.set_sound_enabled(not FarmSettings.is_sound_enabled())

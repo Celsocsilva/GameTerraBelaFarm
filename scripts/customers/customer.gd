@@ -6,7 +6,8 @@ class_name Customer
 
 signal arrived(customer: Customer)
 
-const FARMER_SCENE := preload("res://scenes/player/farmer.tscn")
+## Corpo-cápsula dos NPCs (era a cápsula do fazendeiro antes do modelo 3D, FARMER-GAME-001).
+const FARMER_SCENE := preload("res://scenes/npc/npc_capsule_body.tscn")
 
 ## Esquemas alternativos: corpo (roupa) e detalhe frontal (chapéu/rosto).
 ## Nenhum repete o azul do fazendeiro.

@@ -59,7 +59,7 @@ func _test_assets() -> void:
     print("PUMPKIN_ASSETS_OK stages=4 size=1254x1254")
 
 func _test_map_and_layout() -> void:
-    var map := world.get_map_rect()
+    var map := world.get_previous_map_rect()
     _check(map.size.is_equal_approx(Vector2(77.44, 77.44)), "segunda expansão deve resultar em 77,44 m")
     _check(map.position.is_equal_approx(Vector2(-32.0, -45.44)), "expansão deve ficar à direita e no topo")
     var corn: Rect2 = world.get_crop_area(&"corn")["field"]

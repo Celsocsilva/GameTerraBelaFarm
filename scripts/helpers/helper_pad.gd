@@ -80,8 +80,9 @@ void fragment() {
 	// Preenchimento verde que sobe de baixo conforme o pagamento.
 	if (UV.y > 1.0 - progress) { c = mix(c, progress_color.rgb, 0.55); }
 	// Marcadores de graduação: quadradinhos arredondados.
-	float pip_w = 0.11;
-	float gap = 0.045;
+	// DAIRY-002: com mais de 5 graus (vacas: 11) os marcadores encolhem para caber.
+	float gap = max_grade > 5 ? 0.02 : 0.045;
+	float pip_w = min(0.11, (0.86 - gap * float(max_grade - 1)) / float(max_grade));
 	float row_w = float(max_grade) * pip_w + float(max_grade - 1) * gap;
 	for (int i = 0; i < max_grade; i++) {
 		vec2 center = vec2(0.5 - row_w * 0.5 + pip_w * 0.5 + float(i) * (pip_w + gap), 0.52);
@@ -101,6 +102,12 @@ void fragment() {
 
 var hiring: HelperHiring
 var wallet: Wallet
+## DAIRY-001: a mesma plataforma serve à compra de vacas. Chaves de tradução do
+## título e da linha de graduação ("Grau %d/%d" / "Vacas %d/%d") e quanto somar
+## aos dois números dessa linha (as vacas iniciais do curral).
+var title_key := "HELPER_TITLE"
+var grade_key := "HELPER_GRADE"
+var grade_offset := 0
 ## Áreas de milho e abóbora (CROP-AREAS-001): a plataforma aparece, mas não
 ## cobra nem contrata enquanto a cultura não puder ser plantada.
 var locked := false:
@@ -261,7 +268,7 @@ func process_farmer_position(world_pos: Vector3, delta: float, inventory: Harves
             _warned_no_money = true
             out_of_money.emit(hiring.get_remaining_cost())
         return 0
-    if hiring.grade == 0 and hiring.get_remaining_cost() <= 1 and not hiring.has_initial_requirement():
+    if hiring.requires_material() and hiring.get_remaining_cost() <= 1 and not hiring.has_initial_requirement():
         if _material_in_flight > 0 or (inventory != null and inventory.get_amount(hiring.requirement_item) > 0):
             return 0
         if not _warned_no_material:
@@ -291,7 +298,7 @@ func process_farmer_position(world_pos: Vector3, delta: float, inventory: Harves
 ## Descarrega um fardo/caixa do material a cada MATERIAL_INTERVAL enquanto a
 ## mochila tiver o item e ainda faltar material para a contratação.
 func _unload_material(world_pos: Vector3, delta: float, inventory: HarvestInventory) -> void:
-    if inventory == null or hiring.grade > 0 or hiring.requirement_crates <= 0:
+    if inventory == null or not hiring.requires_material():
         return
     if hiring.get_missing_requirement_units() <= 0 or inventory.get_amount(hiring.requirement_item) <= 0:
         _material_accumulator = 0.0
@@ -380,14 +387,15 @@ func _refresh() -> void:
         return
     var grade := hiring.grade if hiring else 0
     var is_max := hiring != null and hiring.is_max()
-    var cost := HelperConfig.next_cost(grade)
+    var cost := hiring.get_next_cost() if hiring else HelperConfig.next_cost(grade)
+    var max_grade := hiring.max_grade if hiring else HelperConfig.MAX_GRADE
     var paid := hiring.paid if hiring else 0
-    var show_material := hiring != null and grade == 0 and hiring.requirement_crates > 0
+    var show_material := hiring != null and hiring.requires_material()
     _material.set_shader_parameter("grade", grade)
-    _material.set_shader_parameter("max_grade", HelperConfig.MAX_GRADE)
+    _material.set_shader_parameter("max_grade", max_grade)
     _material.set_shader_parameter("progress", 1.0 if is_max else clampf(float(paid) / float(maxi(cost, 1)), 0.0, 1.0))
-    _title.text = tr("HELPER_TITLE")
-    _grade_label.text = tr("HELPER_GRADE") % [grade, HelperConfig.MAX_GRADE]
+    _title.text = tr(title_key)
+    _grade_label.text = tr(grade_key) % [grade + grade_offset, max_grade + grade_offset]
     _cost_icon.visible = not is_max
     _cost_label.text = tr("HELPER_MAX") if is_max else UiStyle.format_int(maxi(cost - paid, 0))
     _cost_icon.position.x = -get_size().x * (0.34 if show_material else 0.26)

@@ -64,6 +64,41 @@ SHOP_ITEM_CART,Carrinho de transporte,Carro de transporte,Transport cart
 SHOP_ITEM_STARTER,Pacote inicial,Paquete inicial,Starter pack
 SHOP_ITEM_FARMER,Pacote do fazendeiro,Paquete del granjero,Farmer pack
 SHOP_ITEM_SEASON,Pacote de temporada,Paquete de temporada,Season pack
+SHOP_ITEM_VIP_WEEK,Pacote VIP (7 dias),Paquete VIP (7 días),VIP package (7 days)
+SHOP_DESC_VIP_WEEK,"Sem anúncios por 7 dias. +700 moedas e +2.000 dinheiros agora; 150 moedas a cada 8 horas durante o pacote.","Sin anuncios por 7 días. +700 monedas y +2.000 de dinero ahora; 150 monedas cada 8 horas durante el paquete.","Ad-free for 7 days. +700 coins and +2,000 cash now; 150 coins every 8 hours during the package."
+SHOP_PRICE_VIP_WEEK,"R$ 55,00","R$ 55,00","R$ 55.00"
+SHOP_ITEM_NO_ADS_MONTH,Sem anúncios (mensal),Sin anuncios (mensual),Ad-free (monthly)
+SHOP_DESC_NO_ADS_MONTH,"Sem anúncios por 30 dias. +300 moedas agora e +1.000 dinheiros por semana durante a assinatura.","Sin anuncios por 30 días. +300 monedas ahora y +1.000 de dinero por semana durante la suscripción.","Ad-free for 30 days. +300 coins now and +1,000 cash per week during the subscription."
+SHOP_PRICE_NO_ADS_MONTH,"R$ 44,99","R$ 44,99","R$ 44.99"
+STORE_V2_TITLE,Loja da Fazenda,Tienda de la Granja,Farm Store
+STORE_V2_DEMO,Preços de demonstração — compra oficial indisponível,Precios de demostración — compra oficial no disponible,Demo prices — official purchase unavailable
+STORE_V2_UNAVAILABLE,Indisponível,No disponible,Unavailable
+STORE_V2_OFFLINE,Sem conexão com a loja,Sin conexión con la tienda,Store connection unavailable
+STORE_V2_NO_PRICE,Preço indisponível,Precio no disponible,Price unavailable
+STORE_V2_PENDING,Processando…,Procesando…,Processing…
+STORE_V2_PURCHASED,Compra simulada aprovada,Compra simulada aprobada,Simulated purchase approved
+STORE_V2_DUPLICATE,Transação já processada,Transacción ya procesada,Transaction already processed
+STORE_V2_VIP_TITLE,VIP 7 dias,VIP 7 días,VIP 7 Days
+STORE_V2_VIP_DESC,"700 moedas + 2.000 dinheiros. Sem anúncios por 7 dias e 150 moedas a cada 8 horas.","700 monedas + 2.000 de dinero. Sin anuncios 7 días y 150 monedas cada 8 horas.","700 coins + 2,000 cash. Ad-free for 7 days and 150 coins every 8 hours."
+STORE_V2_NO_ADS_TITLE,Sem anúncios,Sin anuncios,Ad-Free
+STORE_V2_NO_ADS_DESC,"Assinatura mensal: sem anúncios enquanto ativa, 300 moedas agora e 1.000 dinheiros por semana.","Suscripción mensual: sin anuncios mientras esté activa, 300 monedas ahora y 1.000 de dinero por semana.","Monthly subscription: ad-free while active, 300 coins now and 1,000 cash each week."
+STORE_V2_RURAL_TITLE,Pacote Rural,Pack Rural,Rural Pack
+STORE_V2_RURAL_DESC,300 moedas + 60 tijolos + 200 madeiras,300 monedas + 60 ladrillos + 200 maderas,300 coins + 60 bricks + 200 wood
+STORE_V2_COINS_MINI_TITLE,Moedas Mini,Monedas Mini,Mini Coins
+STORE_V2_COINS_MINI_DESC,120 moedas,120 monedas,120 coins
+STORE_V2_COINS_MEDIUM_TITLE,Moedas Super,Monedas Súper,Super Coins
+STORE_V2_COINS_MEDIUM_DESC,600 moedas,600 monedas,600 coins
+STORE_V2_COINS_LARGE_TITLE,Moedas Mega,Monedas Mega,Mega Coins
+STORE_V2_COINS_LARGE_DESC,1.500 moedas,1.500 monedas,1,500 coins
+STORE_V2_HELPERS_TITLE,6 Ajudantes,6 Ayudantes,6 Helpers
+STORE_V2_HELPERS_DESC,Seis ajudantes. Duração e tarefas serão configuradas antes da venda.,Seis ayudantes. La duración y tareas se configurarán antes de vender.,Six helpers. Duration and tasks will be configured before sale.
+STORE_V2_FOOTER,Skyplan Brasil Ltda marca registrada,Skyplan Brasil Ltda marca registrada,Skyplan Brasil Ltda marca registrada
+STORE_V2_PER_WEEK,/sem,/sem,/wk
+STORE_V2_VIP_NOTE,+150 moedas a cada 8 h,+150 monedas cada 8 h,+150 coins every 8 h
+STORE_V2_NO_ADS_NOTE,Assinatura mensal sem anúncios,Suscripción mensual sin anuncios,Monthly ad-free subscription
+STORE_V2_PER_MONTH,/mês,/mes,/mo
+STORE_V2_RURAL_NOTE,Kit de construção,Kit de construcción,Building kit
+STORE_V2_HELPERS_NOTE,Tarefas e duração em breve,Tareas y duración pronto,Tasks and duration soon
 SETTINGS_TITLE,Configurações,Ajustes,Settings
 SETTINGS_CLOSE,Fechar configurações,Cerrar ajustes,Close settings
 SETTINGS_LANGUAGE,Idioma,Idioma,Language
@@ -78,3 +113,10 @@ LEVEL_LABEL,Nível %d,Nivel %d,Level %d
 SALE_CRATES_ONE,%d caixa,%d caja,%d crate
 SALE_CRATES_MANY,%d caixas,%d cajas,%d crates
 BACKPACK_FULL,Mochila cheia! Leve as caixas ao Balcão de vendas.,¡Mochila llena! Lleva las cajas al puesto de ventas.,Backpack full! Take the crates to the sales stall.
+MILK_NAME,Leite,Leche,Milk
+MILK_AREA_TITLE,Leite,Leche,Milk
+COW_SHOP_TITLE,Vacas,Vacas,Cows
+COW_SHOP_COUNT,%d/%d,%d/%d,%d/%d
+COW_BOUGHT,Vaca nova no curral! Agora são %d vacas dando leite.,¡Vaca nueva en el corral! Ahora son %d vacas dando leche.,New cow in the pen! Now %d cows are giving milk.
+COW_NO_MONEY,Faltam %d para a vaca.,Faltan %d para la vaca.,You need %d more for the cow.
+COWS_HUNGRY,As vacas estão com fome! Encoste na cerca do curral com caixas de milho.,¡Las vacas tienen hambre! Acércate a la cerca del corral con cajas de maíz.,The cows are hungry! Walk up to the pen fence with corn crates.

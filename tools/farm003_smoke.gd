@@ -150,9 +150,12 @@ func _test_farmhouse() -> void:
 
 func _test_cow_pen() -> void:
     var pen := world.cow_pen
-    _check(pen != null and pen.cows.size() >= 7, "curral precisa de 7 vacas")
+    # DAIRY-002: o jogo começa com 1 vaca; as outras 6 cores chegam compradas.
+    _check(pen != null and pen.cows.size() == DairyConfig.INITIAL_COWS, "curral deve começar com %d vaca" % DairyConfig.INITIAL_COWS)
     if pen == null:
         return
+    while pen.cows.size() < CowPen.COLORS.size():
+        pen.add_cow()
     var colors := {}
     for cow in pen.cows:
         colors[cow.color_id] = true
@@ -169,10 +172,12 @@ func _test_cow_pen() -> void:
         _check(not pen.rect.grow(0.5).has_point(Vector2(tree.position.x, tree.position.z)), "árvore dentro do curral")
     _check(pen.gate != null and pen.has_node("FenceNorth") and pen.has_node("FenceWest") and pen.has_node("FenceEast"), "cerca/portão incompletos")
     # PEN-002: curral 10% menor e vegetação em volta (fora da cerca e do rio).
-    _check(absf(pen.rect.get_area() - 15.5 * 11.0 * 0.9) < 0.05, "curral 10%% menor: %.2f m²" % pen.rect.get_area())
+    # DAIRY-002: +3,5 m de largura (casinha de ordenha) e +1,4 m de fundo.
+    _check(absf(pen.rect.get_area() - (15.5 * sqrt(0.9) + 3.5) * (11.0 * sqrt(0.9) + 1.4)) < 0.05, "área do curral: %.2f m²" % pen.rect.get_area())
     var pines := pen.get_surroundings_points("pine")
     var bushes := pen.get_surroundings_points("bush")
-    _check(pines.size() >= 5 and bushes.size() >= 5, "pinheiros/arbustos perto do curral: %d/%d" % [pines.size(), bushes.size()])
+    # FARM-005: o caminho do curral passa pelo canto sudeste e pela frente.
+    _check(pines.size() >= 4 and bushes.size() >= 3, "pinheiros/arbustos perto do curral: %d/%d" % [pines.size(), bushes.size()])
     _check(pen.get_node("Surroundings").get_child_count() == pines.size() + bushes.size(), "vegetação do curral não foi montada")
     for p in pines + bushes:
         var xz := Vector2(p.x, p.z)
@@ -196,7 +201,7 @@ func _test_cow_pen() -> void:
             frames_seen[cow.get_frame_index()] = true
     var walked := 0
     var states := {}
-    var inner := pen.get_inner_rect().grow(0.05)
+    var inner := pen.get_cow_rect().grow(0.05)
     for cow in pen.cows:
         if cow.walked_distance > 0.5:
             walked += 1
