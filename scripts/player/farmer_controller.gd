@@ -9,10 +9,18 @@ class_name FarmerController
 
 var _joystick: Control
 var _camera: Camera3D
+## FARMER-GAME-001: modelo 3D (assets/animations/Farmer/farmer_character.tscn) e seu animador.
+var visual: Node3D
+var animator: FarmerAnimator
 
 func _ready() -> void:
     _camera = get_viewport().get_camera_3d()
     _joystick = get_node_or_null(joystick_path)
+    visual = get_node_or_null("Visual") as Node3D
+    if visual:
+        animator = visual.get_node_or_null("FarmerAnimator") as FarmerAnimator
+    if animator:
+        animator.model_scale = visual.scale.y
 
 func _physics_process(delta: float) -> void:
     if _joystick == null:
@@ -30,6 +38,12 @@ func _physics_process(delta: float) -> void:
         var facing := Vector3(input_vector.x, 0.0, input_vector.y)
         rotation.y = lerp_angle(rotation.y, atan2(-facing.x, -facing.z), min(1.0, delta * 12.0))
     move_and_slide()
+    if animator:
+        animator.update_locomotion(get_horizontal_speed())
+
+## Velocidade real no chão (depois das colisões), usada pela animação.
+func get_horizontal_speed() -> float:
+    return Vector2(get_real_velocity().x, get_real_velocity().z).length()
 
 func _read_input() -> Vector2:
     var keyboard := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
