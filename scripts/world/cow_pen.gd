@@ -14,6 +14,7 @@ const COLORS := [
     "cow_black_white", "cow_dark_brown_white", "cow_light_brown_white",
     "cow_red_white", "cow_grey_white", "cow_golden_white", "cow_jersey",
 ]
+const MILK_HOUSE_TEXTURE := preload("res://assets/buildings/dairy/milking_house_cozy.png")
 const POST_TEXTURE := preload("res://assets/fences/fence_post.png")
 const GATE_TEXTURE := preload("res://assets/fences/fence_gate_01.png")
 ## Travessa lateral: recorte da travessa da coop_fence_02 girado (tools/art).
@@ -48,19 +49,32 @@ const BUSH_TEXTURES := [
 ## [fração x, fração z, desvio x (m), desvio z (m), largura (m)]
 const PINE_SPOTS := [
     [0.18, 0.0, 0.0, -2.1, 3.0], [0.55, 0.0, 0.4, -2.3, 3.2], [0.86, 0.0, -0.2, -2.0, 2.8],
-    [1.0, 0.12, 2.0, 0.0, 3.1], [1.0, 0.5, 2.6, 0.0, 2.9], [1.0, 0.92, 1.9, 0.0, 3.0],
+    # DAIRY-002: pinheiros do leste mais perto da cerca (o curral cresceu para
+    # leste e a faixa de vegetação não pode engolir a fileira de pinheiros do norte).
+    [1.0, 0.12, 1.0, 0.0, 3.1], [1.0, 0.5, 1.2, 0.0, 2.9], [1.0, 0.92, 0.9, 0.0, 3.0],
     [0.0, 1.0, 0.6, 2.5, 2.7],
 ]
 const BUSH_SPOTS := [
     [0.12, 1.0, 0.0, 1.1, 1.3], [0.33, 1.0, 0.3, 1.2, 1.15], [0.52, 1.0, -0.2, 1.05, 1.4],
-    [1.0, 1.0, 1.0, 1.0, 1.25], [1.0, 0.3, 1.1, 0.0, 1.2], [1.0, 0.72, 1.2, 0.3, 1.35],
+    [1.0, 1.0, 1.0, 1.0, 1.25], [1.0, 0.3, 0.8, 0.0, 1.2], [1.0, 0.72, 0.9, 0.3, 1.35],
     [0.35, 0.0, 0.0, -1.0, 1.1], [0.72, 0.0, 0.2, -1.1, 1.2],
 ]
 ## Até onde a vegetação vai além da cerca (FarmWorld bloqueia essa faixa para
 ## árvores/props aleatórios): esquerda, cima, direita, baixo.
-const SURROUNDINGS_MARGIN := [1.2, 3.8, 4.4, 3.4]
+const SURROUNDINGS_MARGIN := [1.2, 3.8, 1.9, 3.4]
 
 var rect := Rect2()
+## DAIRY-001: retângulos XZ (mundo) onde não entra arbusto/pinheiro em volta do
+## curral (área do leite e plataforma de compra de vacas). Defina antes de setup.
+var keep_clear: Array[Rect2] = []
+## DAIRY-002: quantas vacas o curral cria no setup (as outras são compradas).
+var initial_cows := COLORS.size()
+## DAIRY-002/003: casinha de ordenha incorporada ao curral (pegada XZ, mundo),
+## no canto nordeste. Rect2() = sem casinha.
+var house_rect := Rect2()
+## DAIRY-002: cocho de milho dentro do curral (as vacas não pisam nele).
+var feeder_rect := Rect2()
+var milk_house: MeshInstance3D
 var gate_x := 0.0
 var cows: Array[FarmCow] = []
 var gate: MeshInstance3D
@@ -76,6 +90,31 @@ func setup(area: Rect2, gate_center_x: float) -> void:
 func get_inner_rect() -> Rect2:
     return rect.grow_individual(-INNER_MARGIN.x, -INNER_MARGIN.y - 0.4, -INNER_MARGIN.x, -INNER_MARGIN.y)
 
+## Onde as vacas andam: o miolo do curral. DAIRY-003: a casinha (canto
+## nordeste) e o cocho ficam de fora pelos retângulos de get_cow_avoid_rects().
+func get_cow_rect() -> Rect2:
+    return get_inner_rect()
+
+## Retângulos (XZ) onde as vacas não escolhem destino nem nascem.
+func get_cow_avoid_rects() -> Array[Rect2]:
+    var avoid: Array[Rect2] = []
+    if house_rect.has_area():
+        # A vaca é larga (2,6 m): folga maior dos lados.
+        avoid.append(house_rect.grow_individual(1.5, 1.0, 1.5, 1.2))
+    if feeder_rect.has_area():
+        avoid.append(feeder_rect.grow_individual(1.2, 1.0, 1.2, 1.0))
+    return avoid
+
+## Ponto livre (fora da casinha/cocho) mais perto de `p`, dentro da área das vacas.
+func free_cow_point(p: Vector3) -> Vector3:
+    var area := get_cow_rect()
+    var point := Vector3(clampf(p.x, area.position.x, area.end.x), 0.0, clampf(p.z, area.position.y, area.end.y))
+    for blocked in get_cow_avoid_rects():
+        if blocked.has_point(Vector2(point.x, point.z)):
+            # Empurra para oeste da área bloqueada (o lado sempre livre do curral).
+            point.x = maxf(area.position.x, blocked.position.x - 0.3)
+    return point
+
 static func screen_stretch() -> float:
     return 1.0 / cos(deg_to_rad(VIEW_PITCH_DEGREES))
 
@@ -87,6 +126,8 @@ func _build_fences() -> void:
     var gate_right := gate_x + GATE_WIDTH * 0.5
     _add_run("FenceSouthWest", rect.position.x, gate_left, rect.end.y)
     _add_run("FenceSouthEast", gate_right, rect.end.x, rect.end.y)
+    if house_rect.has_area():
+        _build_milk_house()
     gate = _upright_quad("Gate", GATE_TEXTURE, GATE_WIDTH, Vector3(gate_x, 0.0, rect.end.y + 0.01))
     add_child(gate)
     _add_side("FenceWest", rect.position.x)
@@ -100,6 +141,13 @@ func _add_run(label: String, from_x: float, to_x: float, z: float) -> void:
     run.length = to_x - from_x
     run.position = Vector3((from_x + to_x) * 0.5, 0.0, z)
     add_child(run)
+
+## DAIRY-003: casinha de ordenha (arte enviada pelo Celso), em pé de frente
+## para a câmera, no canto superior direito (nordeste) do curral; a base fica
+## na frente da pegada (house_rect.end.y) e o telhado sobe sobre a cerca de trás.
+func _build_milk_house() -> void:
+    milk_house = _upright_quad("MilkHouse", MILK_HOUSE_TEXTURE, house_rect.size.x, Vector3(house_rect.get_center().x, 0.0, house_rect.end.y))
+    add_child(milk_house)
 
 ## Lateral no eixo Z: postes de frente para a câmera + 2 travessas (faixas
 ## deitadas com a madeira da cerca, vistas de cima pela câmera a 45°).
@@ -178,6 +226,13 @@ func get_surroundings_points(kind: String) -> Array[Vector3]:
         # Nada na frente do portão (vão de 1,5 m para cada lado).
         if kind == "bush" and absf(x - gate_x) < GATE_WIDTH * 0.5 + 1.5 and z > rect.end.y:
             continue
+        var blocked := false
+        for clear in keep_clear:
+            if clear.grow(float(spot[4]) * 0.5).has_point(Vector2(x, z)):
+                blocked = true
+                break
+        if blocked:
+            continue
         result.append(Vector3(x, 0.0, z) + Vector3(0.0, float(spot[4]), 0.0))
     return result
 
@@ -247,9 +302,9 @@ func _build_collision() -> void:
         body.add_child(collision)
 
 func _build_cows() -> void:
-    var inner := get_inner_rect()
+    var inner := get_cow_rect()
     var columns := 4
-    for index in COLORS.size():
+    for index in mini(initial_cows, COLORS.size()):
         var cow := FarmCow.new()
         cow.name = "Cow_%s" % COLORS[index]
         cow.setup(COLORS[index], inner, 7001 + index * 131)
@@ -257,8 +312,33 @@ func _build_cows() -> void:
         var col := index % columns
         var row := int(index / columns)
         var fx := (float(col) + 0.5 + (0.5 if row == 1 else 0.0)) / float(columns + (1 if row == 1 else 0))
-        cow.position = Vector3(lerpf(inner.position.x, inner.end.x, fx), 0.0, lerpf(inner.position.y, inner.end.y, 0.25 + 0.5 * row))
+        cow.avoid = get_cow_avoid_rects()
+        cow.position = free_cow_point(Vector3(lerpf(inner.position.x, inner.end.x, fx), 0.0, lerpf(inner.position.y, inner.end.y, 0.25 + 0.5 * row)))
         add_child(cow)
         cows.append(cow)
     for cow in cows:
         cow.herd = cows
+
+## DAIRY-001: vaca comprada. Entra pelo portão (nasce logo dentro dele) e sai
+## andando, cada uma com uma cor de COLORS. Retorna a vaca nova (null no teto).
+func add_cow() -> FarmCow:
+    # Teto de vacas do curral (DairyConfig.MAX_COWS = 7, uma de cada cor).
+    if cows.size() >= DairyConfig.MAX_COWS:
+        return null
+    var inner := get_cow_rect()
+    var index := cows.size()
+    var color: String = COLORS[index % COLORS.size()]
+    var cow := FarmCow.new()
+    cow.name = "Cow_%s_%02d" % [color, index + 1]
+    cow.setup(color, inner, 7001 + index * 131)
+    cow.avoid = get_cow_avoid_rects()
+    cow.position = free_cow_point(Vector3(gate_x, 0.0, inner.end.y - 0.2))
+    add_child(cow)
+    cows.append(cow)
+    for other in cows:
+        other.herd = cows
+    cow.celebrate()
+    return cow
+
+func get_cow_count() -> int:
+    return cows.size()
