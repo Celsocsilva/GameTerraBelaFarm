@@ -104,7 +104,7 @@ func _run() -> void:
 
     # 3. Colisão: o fazendeiro não atravessa o balcão nem passa pelas pontas.
     var farmer := world.farmer
-    farmer.set_physics_process(false)
+    farmer.set_process(false)
     var front_z := counter.global_position.z - half.y
     for x in [0.0, 3.5, -half.x - 2.0, 12.0, -25.0]:
         farmer.global_position = Vector3(x, 0.05, front_z - 2.5)

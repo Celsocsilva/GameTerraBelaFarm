@@ -67,7 +67,14 @@ func _check_soil(world: FarmWorld) -> void:
     # FARM-003: 1,7x reduzida em 10% (1,53x).
     _check(absf(plot_area / legacy_area - 1.7 * FarmWorld.CROP_AREA_REDUCTION) < 0.01, "Área de plantio deve ser 1,53x (obtido %.3f)" % (plot_area / legacy_area))
     # Ciclo da planta com o dobro do tempo (30 s -> 60 s) em todas as fases.
-    _check(is_equal_approx(CropPlant.new().growth_duration, 60.0), "Ciclo da planta deve durar 60 s")
+    var growth_probe := CropPlant.new()
+    _check(growth_probe.stage_durations.size() == CropPlant.STAGES.size() - 1, "cada estágio (menos o final) deve ter duração")
+    _check(growth_probe.stage_durations[0] >= 10.0, "semente/broto deve durar ao menos 10 s")
+    for stage_i in growth_probe.stage_durations.size():
+        _check(growth_probe.stage_durations[stage_i] >= 15.0 * 1.3, "estágio %d deve durar ao menos +30%% dos 15 s antigos" % stage_i)
+    _check(growth_probe.stage_for_elapsed(9.9) == 0, "aos 9,9 s ainda é semente/broto")
+    _check(growth_probe.stage_for_elapsed(growth_probe.growth_duration) == CropPlant.STAGES.size() - 1, "ao fim do ciclo fica pronto para colher")
+    growth_probe.free()
     # Dinheiro 1,7x e base fora da plantação.
     _check(is_equal_approx(MoneyStack.CELL_SIZE.x, MoneyStack.BUNDLE_WIDTH) and is_equal_approx(MoneyStack.BUNDLE_WIDTH, 0.74 * 1.7), "Maços de dinheiro 1,7x")
     var base_half := MoneyStack.get_base_size() * 0.5

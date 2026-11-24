@@ -22,7 +22,11 @@ func _ready() -> void:
     if animator:
         animator.model_scale = visual.scale.y
 
-func _physics_process(delta: float) -> void:
+## FLICK-002: move no _process (e não no _physics_process) para andar no mesmo
+## ritmo da câmera. No celular a tela roda a 120 Hz e a física a 60 Hz: com a
+## câmera suave e o fazendeiro em passos de física, o modelo e a sombra pareciam
+## tremer/deixar um rastro do quadro anterior.
+func _process(delta: float) -> void:
     if _joystick == null:
         _joystick = get_node_or_null("../HUD/VirtualJoystick")
     var input_vector := _read_input()

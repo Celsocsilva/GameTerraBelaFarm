@@ -34,7 +34,7 @@ func _run() -> void:
     world.harvest_controller.enabled = false
     world.customer_queue.set_process(false)
     world.sales_controller.set_process(false)
-    world.farmer.set_physics_process(false)
+    world.farmer.set_process(false)
     _windowed = out_dir != "" and DisplayServer.get_name() != "headless"
     (world.get_node("HUD") as CanvasLayer).visible = false
     var camera := world.camera

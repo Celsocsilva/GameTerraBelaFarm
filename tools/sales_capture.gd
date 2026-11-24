@@ -18,7 +18,7 @@ func _run() -> void:
     world.harvest_controller.enabled = false
     world.customer_queue.set_process(false)
     world.sales_controller.set_process(false)
-    world.farmer.set_physics_process(false)
+    world.farmer.set_process(false)
     var counter := world.sales_counter
     var queue := world.customer_queue
     var sales := world.sales_controller

@@ -122,7 +122,7 @@ func _run() -> void:
             world.camera.global_position = world.camera_focus + Vector3(0.0, world.camera_height, world.camera_distance)
             world.camera.look_at(world.camera_focus, Vector3.UP)
     else:
-        world.farmer.set_physics_process(view == "game")
+        world.farmer.set_process(view == "game")
     print("RIVER_CAPTURE view=", view, " debug=", debug, " hide_river=", hide_river)
     physics_frame.connect(_on_physics)
 

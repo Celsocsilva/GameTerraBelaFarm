@@ -4,8 +4,9 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://by67gy48lcwjo"
 path.s3tc="res://.godot/imported/farmer_trellis_0.png-1a85a27b8330cc68bf858c7e894c14af.s3tc.ctex"
+path.etc2="res://.godot/imported/farmer_trellis_0.png-1a85a27b8330cc68bf858c7e894c14af.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 generator_parameters={
@@ -15,7 +16,7 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/animations/Farmer/source/farmer_trellis_0.png"
-dest_files=["res://.godot/imported/farmer_trellis_0.png-1a85a27b8330cc68bf858c7e894c14af.s3tc.ctex"]
+dest_files=["res://.godot/imported/farmer_trellis_0.png-1a85a27b8330cc68bf858c7e894c14af.s3tc.ctex", "res://.godot/imported/farmer_trellis_0.png-1a85a27b8330cc68bf858c7e894c14af.etc2.ctex"]
 
 [params]
 

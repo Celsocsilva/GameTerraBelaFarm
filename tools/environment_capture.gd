@@ -9,7 +9,7 @@ func _run() -> void:
     root.add_child(world)
     await process_frame
     world.set_process(false)
-    world.farmer.set_physics_process(false)
+    world.farmer.set_process(false)
     world.harvest_controller.enabled = false
     var view := "overview"
     for arg in OS.get_cmdline_user_args():
