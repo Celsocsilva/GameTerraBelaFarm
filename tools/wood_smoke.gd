@@ -140,15 +140,16 @@ func _test_chop_cycle(world: FarmWorld, grove: EucalyptusGrove) -> void:
     # FV-WOOD-002: estágios da queda no ritmo do machado.
     var pos := tree.global_position + Vector3(0.6, 0.0, 0.4)
     var stages: Array[Texture2D] = []
-    var axe_frames := {}
+    var started := [0]
+    var swing_ended := [0]
+    grove.chop_started.connect(func(_t: EucalyptusTree) -> void: started[0] += 1)
+    grove.chop_swing_ended.connect(func() -> void: swing_ended[0] += 1)
     var hit_times: Array[float] = []
     var t := 0.0
     var last_hits := 0
     while tree.state != EucalyptusTree.STUMP and t < 6.0:
         grove.process_farmer_position(pos, 0.02)
         t += 0.02
-        if grove.get_axe_frame() >= 0:
-            axe_frames[grove.get_axe_frame()] = true
         if grove.get_hits_done() != last_hits:
             last_hits = grove.get_hits_done()
             hit_times.append(t)
@@ -158,13 +159,14 @@ func _test_chop_cycle(world: FarmWorld, grove: EucalyptusGrove) -> void:
     var expected: Array[Texture2D] = [EucalyptusTree.SEASON_TEXTURES[grove.season]]
     expected.append_array(EucalyptusTree.FALL_TEXTURES.slice(1))
     _check(stages == expected, "sequência da queda: %s" % [stages.map(func(x): return x.resource_path.get_file() if x else "-")])
-    _check(axe_frames.size() == EucalyptusGrove.AXE_FRAMES.size(), "machado não passou por todos os quadros: %s" % [axe_frames.keys()])
+    # CHOP-002: o golpe do fazendeiro começa junto com o corte e termina no último impacto.
+    _check(started[0] == 1 and swing_ended[0] == 1, "sinais do golpe: começo %d, fim %d" % [started[0], swing_ended[0]])
     _check(hit_times.size() == WoodConfig.CHOP_HITS, "golpes: %d" % hit_times.size())
     if hit_times.size() >= 2:
         _check(absf(hit_times[1] - hit_times[0] - EucalyptusGrove.get_swing_seconds()) < 0.05, "golpes fora do ritmo do machado")
         _check(absf(hit_times[0] - EucalyptusGrove.get_impact_offset()) < 0.05, "primeiro golpe fora do quadro de impacto")
     _check(absf(t - EucalyptusGrove.get_total_chop_seconds()) < 0.08, "tempo do corte %.2f s (esperado %.2f s)" % [t, EucalyptusGrove.get_total_chop_seconds()])
-    _check(not grove.axe.visible, "machado ficou na tela")
+    _check(grove.get_chop_tree() == null, "corte não terminou")
     print("WOOD_FALL stages=%d hits=%s total=%.2fs" % [stages.size(), hit_times, t])
     _check(tree.state == EucalyptusTree.STUMP, "árvore não virou toco")
     _check(tree.get_current_texture() == EucalyptusTree.STUMP_TEXTURE, "toco sem a arte cortada")
@@ -189,7 +191,7 @@ func _test_chop_cycle(world: FarmWorld, grove: EucalyptusGrove) -> void:
     # Sair de perto no meio do corte cancela e devolve a reserva.
     var third := grove.trees[2]
     grove.process_farmer_position(third.global_position, STEP)
-    grove.process_farmer_position(third.global_position, 0.3)
+    grove.process_farmer_position(third.global_position, EucalyptusGrove.get_impact_offset() + 0.05)
     _check(grove.is_chopping() and third.state == EucalyptusTree.CHOPPING and third.cut_stage == 1, "corte não começou")
     grove.process_farmer_position(third.global_position + Vector3(6.0, 0.0, 0.0), STEP)
     _check(not grove.is_chopping() and third.state == EucalyptusTree.GROWN and third.cut_stage == 0 and inventory.get_pending_reservation_count() == 0, "cancelamento do corte")

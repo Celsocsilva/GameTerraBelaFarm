@@ -6,8 +6,9 @@ class_name EucalyptusGrove
 ##   do aparelho; configurável por hemisphere_mode / forced_season ou pelas
 ##   chaves terrabela/seasons/* do projeto). Revisada a cada season_check_seconds.
 ## - Corte (FV-WOOD-002): parado perto (WoodConfig.CHOP_REACH) de um eucalipto
-##   em pé, o fazendeiro dá CHOP_HITS golpes com o machado animado (quadros do
-##   axe_only_animation.gif). Cada golpe, no quadro de impacto, avança um
+##   em pé, o fazendeiro dá CHOP_HITS golpes com o machado (CHOP-002: machado
+##   3D na mão e golpe do próprio fazendeiro, FarmerAnimator.start_chop; antes
+##   era um GIF 2D flutuando ao lado). Cada golpe, no impacto, avança um
 ##   estágio da arte: entalhe, corte fundo, inclinada. Depois a árvore cai
 ##   (FALL_SECONDS), vira o toco com as toras (LOGS_SECONDS) e as toras
 ##   (LOGS_PER_TREE) voam para a mochila pelo mesmo fluxo de reserva da colheita
@@ -20,24 +21,15 @@ signal tree_felled(tree: EucalyptusTree, logs: int)
 signal logs_delivered(units: int, total: int)
 signal chop_blocked(reason: StringName)
 signal season_changed(season: StringName)
+## CHOP-002: o fazendeiro começou a golpear `tree` (o ciclo do golpe começa agora).
+signal chop_started(tree: EucalyptusTree)
+## Os golpes terminaram (último impacto) ou o corte foi cancelado.
+signal chop_swing_ended()
 
 const TREE_SCRIPT := preload("res://scripts/forestry/eucalyptus_tree.gd")
 const FLYER_TEXTURE := preload("res://assets/items/logs/log_bundle_4.png")
 const FLIGHT_TIME := 0.45
 const FLIGHT_HEIGHT := 1.6
-const AXE_FRAMES: Array[Texture2D] = [
-    preload("res://assets/vfx/axe/axe_chop_01.png"),
-    preload("res://assets/vfx/axe/axe_chop_02.png"),
-    preload("res://assets/vfx/axe/axe_chop_03.png"),
-    preload("res://assets/vfx/axe/axe_chop_04.png"),
-    preload("res://assets/vfx/axe/axe_chop_05.png"),
-    preload("res://assets/vfx/axe/axe_chop_06.png"),
-    preload("res://assets/vfx/axe/axe_chop_07.png"),
-    preload("res://assets/vfx/axe/axe_chop_08.png"),
-]
-## Altura do machado na tela (m) e posição: entre o fazendeiro e a árvore.
-const AXE_SIZE := 1.25
-const AXE_HEIGHT := 1.15
 
 ## "auto" (locale do aparelho), "north" ou "south". Vazio usa a configuração do projeto.
 @export var hemisphere_mode: String = ""
@@ -59,7 +51,6 @@ var _hits_done := 0
 var _fall_phase: StringName = &""
 var _phase_time := 0.0
 var _farmer_pos := Vector3.ZERO
-var axe: Sprite3D
 var _reservation: HarvestInventory.Reservation
 var _flights: Array[Dictionary] = []
 var _season_timer := 0.0
@@ -72,19 +63,6 @@ const TREE_SIZE_VARIATION := 0.16
 func setup(points: Array[Vector3], inventory: HarvestInventory, intake: Node3D) -> void:
     _inventory = inventory
     _intake = intake
-    axe = Sprite3D.new()
-    axe.name = "Axe"
-    axe.texture = AXE_FRAMES[0]
-    axe.pixel_size = AXE_SIZE / float(AXE_FRAMES[0].get_height())
-    axe.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-    axe.shaded = false
-    axe.alpha_cut = SpriteBase3D.ALPHA_CUT_DISCARD
-    axe.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-    axe.render_priority = 6
-    axe.no_depth_test = true
-    axe.top_level = true
-    axe.visible = false
-    add_child(axe)
     for index in points.size():
         var tree := TREE_SCRIPT.new() as EucalyptusTree
         tree.name = "Eucalyptus_%02d" % index
@@ -144,30 +122,17 @@ func get_tree_in_reach(world_pos: Vector3, reach: float = WoodConfig.CHOP_REACH)
 func is_chopping() -> bool:
     return _chop_tree != null
 
-## Duração de um ciclo do machado (um golpe) em segundos.
+## Duração de um golpe (erguer, descer, voltar) em segundos.
 static func get_swing_seconds() -> float:
-    var total := 0
-    for ms in WoodConfig.AXE_FRAME_MS:
-        total += ms
-    return float(total) / 1000.0 / WoodConfig.AXE_SPEED
+    return WoodConfig.CHOP_SWING_SECONDS
 
 ## Momento (s, dentro do ciclo) em que a lâmina bate no tronco.
 static func get_impact_offset() -> float:
-    var total := 0
-    for i in WoodConfig.AXE_FRAME_MS.size():
-        if i == WoodConfig.AXE_IMPACT_FRAME:
-            break
-        total += WoodConfig.AXE_FRAME_MS[i]
-    return float(total) / 1000.0 / WoodConfig.AXE_SPEED
+    return WoodConfig.CHOP_IMPACT_SECONDS
 
-## Quadro do machado no tempo t (s) de um ciclo.
-static func axe_frame_at(t: float) -> int:
-    var ms := fposmod(t, get_swing_seconds()) * 1000.0 * WoodConfig.AXE_SPEED
-    for i in WoodConfig.AXE_FRAME_MS.size():
-        ms -= WoodConfig.AXE_FRAME_MS[i]
-        if ms < 0.0:
-            return i
-    return WoodConfig.AXE_FRAME_MS.size() - 1
+## Árvore sendo cortada (null se nenhuma).
+func get_chop_tree() -> EucalyptusTree:
+    return _chop_tree
 
 ## Tempo total de um corte, do primeiro quadro do machado até as toras saírem.
 static func get_total_chop_seconds() -> float:
@@ -203,7 +168,7 @@ func process_farmer_position(world_pos: Vector3, delta: float) -> void:
     _fall_phase = &""
     _phase_time = 0.0
     tree.start_chop()
-    _update_axe()
+    chop_started.emit(tree)
 
 func _advance_chop(world_pos: Vector3, delta: float) -> void:
     if _fall_phase == &"":
@@ -221,7 +186,7 @@ func _advance_chop(world_pos: Vector3, delta: float) -> void:
         if _hits_done >= WoodConfig.CHOP_HITS:
             _fall_phase = &"leaning"
             _phase_time = _chop_time - (impact + swing * (WoodConfig.CHOP_HITS - 1))
-        _update_axe()
+            chop_swing_ended.emit()
         return
     _phase_time += delta
     if _fall_phase == &"leaning" and _phase_time >= WoodConfig.FALL_SECONDS:
@@ -230,30 +195,6 @@ func _advance_chop(world_pos: Vector3, delta: float) -> void:
         _chop_tree.fall()
     if _fall_phase == &"fallen" and _phase_time >= WoodConfig.LOGS_SECONDS:
         _finish_chop()
-    _update_axe()
-
-## Machado entre o fazendeiro e a árvore, virado para o lado da árvore; some
-## depois do último golpe.
-func _update_axe() -> void:
-    if axe == null:
-        return
-    var swinging := _chop_tree != null and _fall_phase == &""
-    var after_last_hit := _chop_tree != null and _fall_phase == &"leaning" and _phase_time < 0.15
-    axe.visible = swinging or after_last_hit
-    if not axe.visible:
-        return
-    var frame := axe_frame_at(_chop_time) if swinging else WoodConfig.AXE_IMPACT_FRAME
-    axe.texture = AXE_FRAMES[frame]
-    var tree_pos := _chop_tree.global_position
-    var toward := Vector3(tree_pos.x - _farmer_pos.x, 0.0, tree_pos.z - _farmer_pos.z)
-    var reach := minf(toward.length() * 0.55, 0.8)
-    toward = toward.normalized() if toward.length() > 0.01 else Vector3.LEFT
-    # A arte do GIF bate para a esquerda; árvore à direita espelha o machado.
-    axe.flip_h = toward.x > 0.0
-    axe.global_position = Vector3(_farmer_pos.x, AXE_HEIGHT, _farmer_pos.z) + toward * reach
-
-func get_axe_frame() -> int:
-    return AXE_FRAMES.find(axe.texture) if axe and axe.visible else -1
 
 func get_fall_phase() -> StringName:
     return _fall_phase
@@ -270,13 +211,15 @@ func get_block_reason() -> StringName:
 func _cancel_chop() -> void:
     if _chop_tree:
         _chop_tree.cancel_chop()
+    var was_swinging := _chop_tree != null and _fall_phase == &""
     _chop_tree = null
     _fall_phase = &""
     _hits_done = 0
     if _reservation:
         _inventory.cancel(_reservation)
     _reservation = null
-    _update_axe()
+    if was_swinging:
+        chop_swing_ended.emit()
 
 func _finish_chop() -> void:
     var tree := _chop_tree
@@ -284,7 +227,6 @@ func _finish_chop() -> void:
     _chop_tree = null
     _reservation = null
     _fall_phase = &""
-    _update_axe()
     tree.fell()
     tree_felled.emit(tree, reservation.amount)
     _launch_logs(tree, reservation)
