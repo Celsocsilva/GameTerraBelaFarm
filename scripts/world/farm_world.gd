@@ -1290,6 +1290,17 @@ func _build_environment() -> void:
     sun.rotation_degrees = Vector3(-52.0, -28.0, 0.0)
     sun.light_energy = 1.2
     sun.shadow_enabled = true
+    # FLICK-002: sombra mais macia e estável. A câmera mostra só ~30 m do mapa,
+    # então o mapa de sombra cobre 45 m (em vez de 100) com 2 divisões: mais
+    # resolução perto do fazendeiro, bordas sem serrilhado "pulando" a cada
+    # passo e um leve desfoque para a sombra parecer natural.
+    sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+    sun.directional_shadow_max_distance = 45.0
+    sun.directional_shadow_blend_splits = true
+    sun.shadow_blur = 1.6
+    sun.shadow_bias = 0.08
+    sun.shadow_normal_bias = 1.2
+    sun.shadow_opacity = 0.75
     add_child(sun)
 
 func _build_ground() -> void:

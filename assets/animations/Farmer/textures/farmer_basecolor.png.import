@@ -4,15 +4,16 @@ importer="texture"
 type="CompressedTexture2D"
 uid="uid://bocv8gd0yd1dk"
 path.s3tc="res://.godot/imported/farmer_basecolor.png-f762ea433b423a1dd6dcc6fe3e2cc11f.s3tc.ctex"
+path.etc2="res://.godot/imported/farmer_basecolor.png-f762ea433b423a1dd6dcc6fe3e2cc11f.etc2.ctex"
 metadata={
-"imported_formats": ["s3tc_bptc"],
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
 "vram_texture": true
 }
 
 [deps]
 
 source_file="res://assets/animations/Farmer/textures/farmer_basecolor.png"
-dest_files=["res://.godot/imported/farmer_basecolor.png-f762ea433b423a1dd6dcc6fe3e2cc11f.s3tc.ctex"]
+dest_files=["res://.godot/imported/farmer_basecolor.png-f762ea433b423a1dd6dcc6fe3e2cc11f.s3tc.ctex", "res://.godot/imported/farmer_basecolor.png-f762ea433b423a1dd6dcc6fe3e2cc11f.etc2.ctex"]
 
 [params]
 

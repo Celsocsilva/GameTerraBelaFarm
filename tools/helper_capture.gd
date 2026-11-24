@@ -23,7 +23,7 @@ func _run() -> void:
     root.add_child(world)
     await process_frame
     world.set_process(false)
-    world.farmer.set_physics_process(false)
+    world.farmer.set_process(false)
     world.harvest_controller.enabled = false
     world.sales_controller.set_process(false)
     world.customer_queue.set_process(false)

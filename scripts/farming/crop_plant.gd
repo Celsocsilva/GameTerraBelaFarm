@@ -8,8 +8,17 @@ signal ready_for_harvest(cell_id: String)
 ## CROP-CORN-001: cultura da planta (arte dos estágios vem de CropCatalog).
 @export var crop_id: StringName = &"tomato"
 @export var accelerated_test_mode: bool = true
-## Ciclo completo (broto -> pronto); dobrado de 30 s para 60 s.
-@export var growth_duration: float = 60.0
+## GROW-002: duração (s) de cada estágio antes de avançar ao próximo, na ordem de
+## STAGES (o último, READY_TO_HARVEST, não avança). Antes eram 15 s por estágio
+## (60 s / 4); agora a semente/broto dura 20 s e cada fase ganhou +33%.
+@export var stage_durations: PackedFloat32Array = PackedFloat32Array([20.0, 20.0, 20.0])
+## Tempo total do plantio até ficar pronto para colher (soma de stage_durations).
+var growth_duration: float:
+	get:
+		var total := 0.0
+		for d in stage_durations:
+			total += d
+		return total
 @export var cell_width: float = 1.15
 ## Largura máxima visível da planta em relação à célula. Acima de 1.0 a copa
 ## invade levemente a célula vizinha, como em jogos de fazenda cozy.
@@ -87,10 +96,19 @@ func _process(_delta: float) -> void:
 	if planted_at <= 0.0 or is_harvested:
 		return
 	var elapsed := Time.get_ticks_msec() / 1000.0 - planted_at
-	var duration := growth_duration if accelerated_test_mode else growth_duration * 10.0
-	var next_index := mini(STAGES.size() - 1, int((elapsed / duration) * STAGES.size()))
+	var next_index := stage_for_elapsed(elapsed)
 	if next_index != stage_index:
 		_update_stage(next_index)
+
+## Estágio correspondente a elapsed segundos desde o plantio.
+func stage_for_elapsed(elapsed: float) -> int:
+	var scale := 1.0 if accelerated_test_mode else 10.0
+	var threshold := 0.0
+	for i in mini(stage_durations.size(), STAGES.size() - 1):
+		threshold += stage_durations[i] * scale
+		if elapsed < threshold:
+			return i
+	return STAGES.size() - 1
 
 ## Arte dos estágios desta cultura (tomate: STAGE_ASSETS).
 func get_stage_assets() -> Array:
