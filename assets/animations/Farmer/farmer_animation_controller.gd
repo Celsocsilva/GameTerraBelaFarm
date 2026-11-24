@@ -368,7 +368,9 @@ func _build_chop_animation() -> void:
     library.add_animation(ANIM_CHOP, anim)
 
 
-## Machado simples (cabo de madeira, cinta vermelha e lâmina de metal).
+## Machado cozy (CHOP-003, pedido do Celso): cabo grosso de madeira clara com
+## pomo arredondado, cinta vermelha e lâmina larga e brilhante, para ler bem
+## na tela do celular. Eixo Y = cabo; +Z = fio da lâmina (lado do golpe).
 func _build_axe() -> void:
     var host := get_parent() as Node3D
     if host == null:
@@ -379,45 +381,52 @@ func _build_axe() -> void:
     axe.visible = false
     host.add_child.call_deferred(axe)
     var wood := StandardMaterial3D.new()
-    wood.albedo_color = Color(0.55, 0.33, 0.16)
-    wood.roughness = 0.8
+    wood.albedo_color = Color(0.78, 0.5, 0.26)
+    wood.roughness = 0.75
+    var wood_dark := StandardMaterial3D.new()
+    wood_dark.albedo_color = Color(0.5, 0.29, 0.13)
+    wood_dark.roughness = 0.8
     var metal := StandardMaterial3D.new()
-    metal.albedo_color = Color(0.74, 0.76, 0.8)
-    metal.metallic = 0.4
-    metal.roughness = 0.35
+    metal.albedo_color = Color(0.82, 0.86, 0.92)
+    metal.metallic = 0.35
+    metal.roughness = 0.3
     var band := StandardMaterial3D.new()
-    band.albedo_color = Color(0.78, 0.16, 0.12)
-    var handle := MeshInstance3D.new()
-    handle.name = "Handle"
-    var handle_mesh := CylinderMesh.new()
-    handle_mesh.top_radius = 0.03
-    handle_mesh.bottom_radius = 0.036
-    handle_mesh.height = 0.85
-    handle_mesh.radial_segments = 10
-    handle.mesh = handle_mesh
-    handle.material_override = wood
-    handle.position = Vector3(0.0, 0.3, 0.0)
-    axe.add_child(handle)
-    var head := MeshInstance3D.new()
-    head.name = "Head"
-    var head_mesh := PrismMesh.new()
-    head_mesh.size = Vector3(0.24, 0.26, 0.05)
-    head.mesh = head_mesh
-    head.material_override = metal
-    # Ponta do prisma (o fio) apontando para a frente do golpe (+Z local).
-    head.rotation = Vector3(PI * 0.5, 0.0, 0.0)
-    head.position = Vector3(0.0, 0.66, 0.12)
-    axe.add_child(head)
-    var collar := MeshInstance3D.new()
-    collar.name = "Band"
-    var collar_mesh := CylinderMesh.new()
-    collar_mesh.top_radius = 0.045
-    collar_mesh.bottom_radius = 0.045
-    collar_mesh.height = 0.1
-    collar.mesh = collar_mesh
-    collar.material_override = band
-    collar.position = Vector3(0.0, 0.66, 0.0)
-    axe.add_child(collar)
+    band.albedo_color = Color(0.86, 0.2, 0.14)
+    band.roughness = 0.6
+    _axe_part(CylinderMesh.new(), wood, Vector3(0.0, 0.3, 0.0), func(m: CylinderMesh) -> void:
+        m.top_radius = 0.05
+        m.bottom_radius = 0.06
+        m.height = 0.95
+        m.radial_segments = 12)
+    _axe_part(SphereMesh.new(), wood_dark, Vector3(0.0, -0.18, 0.0), func(m: SphereMesh) -> void:
+        m.radius = 0.08
+        m.height = 0.14)
+    _axe_part(CylinderMesh.new(), band, Vector3(0.0, 0.7, 0.0), func(m: CylinderMesh) -> void:
+        m.top_radius = 0.075
+        m.bottom_radius = 0.075
+        m.height = 0.2
+        m.radial_segments = 12)
+    # Lâmina larga e arredondada: corpo de metal + disco no fio (curva cozy).
+    _axe_part(BoxMesh.new(), metal, Vector3(0.0, 0.72, 0.12), func(m: BoxMesh) -> void:
+        m.size = Vector3(0.07, 0.24, 0.22))
+    var edge := _axe_part(CylinderMesh.new(), metal, Vector3(0.0, 0.72, 0.2), func(m: CylinderMesh) -> void:
+        m.top_radius = 0.21
+        m.bottom_radius = 0.21
+        m.height = 0.075
+        m.radial_segments = 24)
+    edge.rotation = Vector3(0.0, 0.0, PI * 0.5)
+    # Talão de metal atrás do cabo (equilibra a silhueta).
+    _axe_part(BoxMesh.new(), metal, Vector3(0.0, 0.72, -0.1), func(m: BoxMesh) -> void:
+        m.size = Vector3(0.1, 0.2, 0.12))
+
+func _axe_part(mesh: PrimitiveMesh, material: Material, position: Vector3, setup: Callable) -> MeshInstance3D:
+    setup.call(mesh)
+    var part := MeshInstance3D.new()
+    part.mesh = mesh
+    part.material_override = material
+    part.position = position
+    axe.add_child(part)
+    return part
 
 
 ## Cabo na mão direita, continuando a linha do antebraço; a lâmina fica do lado
@@ -443,7 +452,7 @@ func _place_axe() -> void:
     blade = blade.normalized()
     lateral = along.cross(blade).normalized()
     var size := skeleton.global_basis.get_scale().y
-    axe.global_transform = Transform3D(Basis(lateral, along, blade).scaled(Vector3.ONE * size * 0.4), hand_pos)
+    axe.global_transform = Transform3D(Basis(lateral, along, blade).scaled(Vector3.ONE * size * 0.55), hand_pos)
 
 
 func _on_tree_animation_finished(anim_name: StringName) -> void:
