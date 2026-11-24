@@ -40,7 +40,7 @@ signal landed(target: Vector3)
 ## SEED-002: o rastro de grãos no solo é alongado na direção do arremesso
 ## (elipse), como a semente lançada a lanço que "escorre" para a frente.
 @export_range(1.0, 3.0, 0.05) var ground_scatter_stretch: float = 1.6
-@export_range(0.2, 3.0, 0.1) var ground_grain_lifetime: float = 1.1
+@export_range(0.2, 3.0, 0.1) var ground_grain_lifetime: float = 0.8
 
 const SEED_ATLAS := preload("res://assets/seeds/tomato_seed_atlas_2x2.png")
 const ATLAS_FRAMES := 2
@@ -54,7 +54,10 @@ var _launched := false
 ## longe depois, como um único gesto de semear a lanço.
 var _throw_direction := Vector2(0.0, 1.0)
 
-func launch(origin: Vector3, target: Vector3, delay: float = 0.0) -> void:
+## SEED-004: `origin_provider` (opcional) devolve a posição da mão NA HORA do
+## lançamento. Sem ele, um punhado com atraso saía de onde a mão estava no
+## passo anterior: com o fazendeiro andando, isso ficava atrás das costas dele.
+func launch(origin: Vector3, target: Vector3, delay: float = 0.0, origin_provider: Callable = Callable()) -> void:
 	if _launched:
 		push_warning("SeedThrow.launch chamado duas vezes; instancie uma nova cena por punhado.")
 		return
@@ -69,6 +72,12 @@ func launch(origin: Vector3, target: Vector3, delay: float = 0.0) -> void:
 		if not is_inside_tree():
 			return
 		visible = true
+	if origin_provider.is_valid():
+		origin = origin_provider.call()
+		global_position = origin
+		var new_flat := Vector2(target.x - origin.x, target.z - origin.z)
+		if new_flat.length() > 0.001:
+			_throw_direction = new_flat.normalized()
 
 	var velocity := solve_launch_velocity(origin, target, gravity, flight_time)
 	_configure_layer(particles, velocity, seed_amount, seed_scale_min, seed_scale_max, spread_degrees, velocity_variation)
@@ -83,6 +92,10 @@ func launch(origin: Vector3, target: Vector3, delay: float = 0.0) -> void:
 	queue_free()
 
 func _configure_layer(layer: GPUParticles3D, velocity: Vector3, amount: int, scale_min: float, scale_max: float, spread: float, variation: float) -> void:
+	# SEED-004: sem interpolação de emissão. Com ela, um punhado cuja mão
+	# andou durante o atraso nascia espalhado no rastro entre a posição antiga
+	# (atrás do fazendeiro) e a nova.
+	layer.interpolate = false
 	if amount <= 0:
 		layer.emitting = false
 		layer.visible = false
@@ -125,7 +138,8 @@ func _scatter_on_ground(center: Vector3) -> void:
 		var radius := ground_scatter_radius * pow(randf(), 0.8)
 		var angle := randf() * TAU
 		# Elipse alongada na direção do arremesso (SEED-002).
-		var along := cos(angle) * radius * ground_scatter_stretch
+		# SEED-004: os grãos escorrem só para a frente do pouso (nunca para trás).
+		var along := absf(cos(angle)) * radius * ground_scatter_stretch
 		var across := sin(angle) * radius
 		var dir := _throw_direction
 		var side := Vector2(-dir.y, dir.x)

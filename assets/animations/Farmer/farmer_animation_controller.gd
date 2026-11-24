@@ -28,6 +28,12 @@ const ANIM_SOW := &"Interact"
 const ANIM_HARVEST := &"PickUp_Table"
 const ANIM_DELIVER := &"Interact"
 const ANIM_PLANT_KNEEL := &"Fixing_Kneeling"
+## CHOP-002: golpe de machado com as duas mãos, gerado em código sobre a pose
+## de Idle (a biblioteca não tem animação de cortar). Ciclo e impacto iguais aos
+## do EucalyptusGrove (WoodConfig.CHOP_SWING_SECONDS / CHOP_IMPACT_SECONDS).
+const ANIM_CHOP := &"Chop_Swing"
+## Ossos da camada de corte: tronco e braços (pernas seguem a locomoção).
+const CHOP_BONES := ["spine_02", "spine_03", "neck_01", "head", "clavicle_l", "upperarm_l", "lowerarm_l", "hand_l", "clavicle_r", "upperarm_r", "lowerarm_r", "hand_r"]
 
 ## Estados de locomoção (entradas do nó Transition).
 const LOCO := {
@@ -69,6 +75,11 @@ var loco_state: StringName = &"idle"
 var last_action: StringName = &""
 
 var _moving := false
+var chopping := false
+var _chop_amount := 0.0
+var _skeleton: Skeleton3D
+## Machado 3D na mão direita (só aparece cortando).
+var axe: Node3D
 var _upper_anim: AnimationNodeAnimation
 var _full_anim: AnimationNodeAnimation
 
@@ -129,7 +140,22 @@ func _build_tree() -> void:
     bt.add_node("full", full)
     bt.connect_node("full", 0, "upper")
     bt.connect_node("full", 1, "full_speed")
-    bt.connect_node("output", 0, "full")
+
+    # CHOP-002: camada de corte (tronco e braços), misturada por blend_amount.
+    _build_chop_animation()
+    var chop_blend := AnimationNodeBlend2.new()
+    chop_blend.filter_enabled = true
+    for bone in CHOP_BONES:
+        chop_blend.set_filter_path(NodePath("%s:%s" % [SKELETON_PATH, bone]), true)
+    var chop_anim := AnimationNodeAnimation.new()
+    chop_anim.animation = ANIM_CHOP
+    bt.add_node("chop_anim", chop_anim)
+    bt.add_node("chop_seek", AnimationNodeTimeSeek.new())
+    bt.connect_node("chop_seek", 0, "chop_anim")
+    bt.add_node("chop", chop_blend)
+    bt.connect_node("chop", 0, "full")
+    bt.connect_node("chop", 1, "chop_seek")
+    bt.connect_node("output", 0, "chop")
 
     tree = AnimationTree.new()
     tree.name = "AnimationTree"
@@ -141,6 +167,8 @@ func _build_tree() -> void:
     tree.animation_finished.connect(_on_tree_animation_finished)
     tree.active = true
     _set_loco(&"idle", 1.0)
+    tree.set("parameters/chop/blend_amount", 0.0)
+    _build_axe()
 
 
 ## Chamar todo quadro com a velocidade horizontal (m/s do jogo).
@@ -222,6 +250,200 @@ func _play(anim_name: StringName, speed: float, force_full := false) -> void:
         _full_anim.animation = anim_name
         tree.set("parameters/full_speed/scale", speed)
         tree.set("parameters/full/request", AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+
+
+## CHOP-002: começa a cortar (golpe em loop, sincronizado: o ciclo recomeça
+## agora, então o impacto cai em CHOP_IMPACT_SECONDS, como no EucalyptusGrove).
+func start_chop() -> void:
+    if tree == null:
+        return
+    chopping = true
+    tree.set("parameters/chop_seek/seek_request", 0.0)
+
+
+## Para de cortar: braços e tronco voltam à locomoção com um fade curto.
+func stop_chop() -> void:
+    chopping = false
+
+
+func get_chop_amount() -> float:
+    return _chop_amount
+
+
+func _process(delta: float) -> void:
+    if tree == null:
+        return
+    var target := 1.0 if chopping else 0.0
+    # Entra rápido (~0,15 s) e sai suave (~0,3 s): sem tranco de pose.
+    _chop_amount = move_toward(_chop_amount, target, delta * (6.5 if chopping else 3.4))
+    tree.set("parameters/chop/blend_amount", _chop_amount)
+    if axe:
+        axe.visible = _chop_amount > 0.02
+        if axe.visible:
+            _place_axe()
+
+
+func _get_skeleton() -> Skeleton3D:
+    if _skeleton == null and animation_player:
+        var anim_root := animation_player.get_node_or_null(animation_player.root_node)
+        if anim_root:
+            _skeleton = anim_root.get_node_or_null(SKELETON_PATH) as Skeleton3D
+    return _skeleton
+
+
+## Pose-base de cada osso: o primeiro quadro do Idle (ou o rest), em rotação local.
+func _base_local_rotation(skeleton: Skeleton3D, idle: Animation, bone: int) -> Quaternion:
+    if idle:
+        var track := idle.find_track(NodePath("%s:%s" % [SKELETON_PATH, skeleton.get_bone_name(bone)]), Animation.TYPE_ROTATION_3D)
+        if track >= 0:
+            return idle.rotation_track_interpolate(track, 0.0)
+    return skeleton.get_bone_rest(bone).basis.get_rotation_quaternion()
+
+
+## Golpe com as duas mãos no espaço do esqueleto (frente +Z, cima +Y, direita
+## do fazendeiro -X): ergue os braços acima da cabeça inclinando o tronco para
+## trás, desce forte até a altura do tronco da árvore curvando o tronco para a
+## frente (impacto), segue o movimento e volta à guarda.
+func _build_chop_animation() -> void:
+    var skeleton := _get_skeleton()
+    if skeleton == null or animation_player.has_animation(ANIM_CHOP):
+        return
+    var idle: Animation = animation_player.get_animation(ANIM_IDLE) if animation_player.has_animation(ANIM_IDLE) else null
+    var count := skeleton.get_bone_count()
+    var base_local: Array[Quaternion] = []
+    var base_global: Array[Quaternion] = []
+    for bone in count:
+        base_local.append(_base_local_rotation(skeleton, idle, bone))
+        base_global.append(Quaternion.IDENTITY)
+    for bone in count:
+        var parent := skeleton.get_bone_parent(bone)
+        base_global[bone] = (base_global[parent] if parent >= 0 else Quaternion.IDENTITY) * base_local[bone]
+    var cycle := float(WoodConfig.CHOP_SWING_SECONDS)
+    var impact := float(WoodConfig.CHOP_IMPACT_SECONDS)
+    # [tempo, ergue o braço (graus, frente/cima), fecha as mãos ao centro,
+    #  curva o tronco (+ frente), dobra o cotovelo]
+    var keys := [
+        [0.0, 50.0, 14.0, 4.0, 25.0],
+        [impact * 0.42, 120.0, 16.0, -6.0, 55.0],
+        [impact * 0.8, 168.0, 18.0, -14.0, 40.0],
+        [impact, 78.0, 22.0, 24.0, 6.0],
+        [impact + (cycle - impact) * 0.3, 62.0, 20.0, 20.0, 10.0],
+        [cycle, 50.0, 14.0, 4.0, 25.0],
+    ]
+    var raise_axis := Vector3(-1.0, 0.0, 0.0)
+    var bend_axis := Vector3(1.0, 0.0, 0.0)
+    var anim := Animation.new()
+    anim.length = cycle
+    anim.loop_mode = Animation.LOOP_LINEAR
+    for bone_name in CHOP_BONES:
+        var bone := skeleton.find_bone(bone_name)
+        if bone < 0:
+            continue
+        var track := anim.add_track(Animation.TYPE_ROTATION_3D)
+        anim.track_set_path(track, NodePath("%s:%s" % [SKELETON_PATH, bone_name]))
+        anim.track_set_interpolation_type(track, Animation.INTERPOLATION_CUBIC)
+        var parent := skeleton.get_bone_parent(bone)
+        var parent_global: Quaternion = base_global[parent] if parent >= 0 else Quaternion.IDENTITY
+        var side := 1.0 if String(bone_name).ends_with("_r") else -1.0
+        for key in keys:
+            var extra := Quaternion.IDENTITY
+            match bone_name:
+                "spine_02":
+                    extra = Quaternion(bend_axis, deg_to_rad(key[3] * 0.45))
+                "spine_03":
+                    extra = Quaternion(bend_axis, deg_to_rad(key[3] * 0.55))
+                "neck_01", "head":
+                    # A cabeça compensa: o olhar fica no tronco da árvore.
+                    extra = Quaternion(bend_axis, deg_to_rad(-key[3] * 0.3))
+                "upperarm_l", "upperarm_r":
+                    extra = Quaternion(Vector3.UP, deg_to_rad(key[2] * side)) * Quaternion(raise_axis, deg_to_rad(key[1]))
+                "lowerarm_l", "lowerarm_r":
+                    extra = Quaternion(raise_axis, deg_to_rad(key[4]))
+            var local: Quaternion = parent_global.inverse() * extra * parent_global * base_local[bone]
+            anim.rotation_track_insert_key(track, key[0], local.normalized())
+    var library := animation_player.get_animation_library(&"")
+    if library == null:
+        library = AnimationLibrary.new()
+        animation_player.add_animation_library(&"", library)
+    library.add_animation(ANIM_CHOP, anim)
+
+
+## Machado simples (cabo de madeira, cinta vermelha e lâmina de metal).
+func _build_axe() -> void:
+    var host := get_parent() as Node3D
+    if host == null:
+        return
+    axe = Node3D.new()
+    axe.name = "ChopAxe"
+    axe.top_level = true
+    axe.visible = false
+    host.add_child.call_deferred(axe)
+    var wood := StandardMaterial3D.new()
+    wood.albedo_color = Color(0.55, 0.33, 0.16)
+    wood.roughness = 0.8
+    var metal := StandardMaterial3D.new()
+    metal.albedo_color = Color(0.74, 0.76, 0.8)
+    metal.metallic = 0.4
+    metal.roughness = 0.35
+    var band := StandardMaterial3D.new()
+    band.albedo_color = Color(0.78, 0.16, 0.12)
+    var handle := MeshInstance3D.new()
+    handle.name = "Handle"
+    var handle_mesh := CylinderMesh.new()
+    handle_mesh.top_radius = 0.03
+    handle_mesh.bottom_radius = 0.036
+    handle_mesh.height = 0.85
+    handle_mesh.radial_segments = 10
+    handle.mesh = handle_mesh
+    handle.material_override = wood
+    handle.position = Vector3(0.0, 0.3, 0.0)
+    axe.add_child(handle)
+    var head := MeshInstance3D.new()
+    head.name = "Head"
+    var head_mesh := PrismMesh.new()
+    head_mesh.size = Vector3(0.24, 0.26, 0.05)
+    head.mesh = head_mesh
+    head.material_override = metal
+    # Ponta do prisma (o fio) apontando para a frente do golpe (+Z local).
+    head.rotation = Vector3(PI * 0.5, 0.0, 0.0)
+    head.position = Vector3(0.0, 0.66, 0.12)
+    axe.add_child(head)
+    var collar := MeshInstance3D.new()
+    collar.name = "Band"
+    var collar_mesh := CylinderMesh.new()
+    collar_mesh.top_radius = 0.045
+    collar_mesh.bottom_radius = 0.045
+    collar_mesh.height = 0.1
+    collar.mesh = collar_mesh
+    collar.material_override = band
+    collar.position = Vector3(0.0, 0.66, 0.0)
+    axe.add_child(collar)
+
+
+## Cabo na mão direita, continuando a linha do antebraço; a lâmina fica do lado
+## do golpe (perpendicular ao braço, no plano do movimento).
+func _place_axe() -> void:
+    var skeleton := _get_skeleton()
+    if skeleton == null or not skeleton.is_inside_tree() or not axe.is_inside_tree():
+        return
+    var hand := skeleton.find_bone("hand_r")
+    var elbow := skeleton.find_bone("lowerarm_r")
+    if hand < 0 or elbow < 0:
+        return
+    var hand_pos := skeleton.global_transform * skeleton.get_bone_global_pose(hand).origin
+    var elbow_pos := skeleton.global_transform * skeleton.get_bone_global_pose(elbow).origin
+    var along := hand_pos - elbow_pos
+    if along.length() < 0.0001:
+        return
+    along = along.normalized()
+    var lateral := skeleton.global_basis.x.normalized()
+    var blade := lateral.cross(along)
+    if blade.length() < 0.001:
+        blade = skeleton.global_basis.z.normalized()
+    blade = blade.normalized()
+    lateral = along.cross(blade).normalized()
+    var size := skeleton.global_basis.get_scale().y
+    axe.global_transform = Transform3D(Basis(lateral, along, blade).scaled(Vector3.ONE * size * 0.4), hand_pos)
 
 
 func _on_tree_animation_finished(anim_name: StringName) -> void:

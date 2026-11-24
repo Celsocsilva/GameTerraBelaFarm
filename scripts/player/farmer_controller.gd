@@ -9,6 +9,8 @@ class_name FarmerController
 ## FarmWorld liga `sowing`). A troca é suave para não dar tranco.
 @export_range(0.2, 1.0, 0.05) var sowing_speed_factor: float = 0.55
 var sowing := false
+## CHOP-002: ponto para onde virar quando parado (a árvore sendo cortada).
+var face_target: Variant = null
 var _speed_factor := 1.0
 @export var joystick_path: NodePath = NodePath("../HUD/VirtualJoystick")
 
@@ -47,6 +49,10 @@ func _process(delta: float) -> void:
     if input_vector.length_squared() > 0.001:
         var facing := Vector3(input_vector.x, 0.0, input_vector.y)
         rotation.y = lerp_angle(rotation.y, atan2(-facing.x, -facing.z), min(1.0, delta * 12.0))
+    elif face_target is Vector3:
+        var to_target: Vector3 = face_target - global_position
+        if Vector2(to_target.x, to_target.z).length() > 0.05:
+            rotation.y = lerp_angle(rotation.y, atan2(-to_target.x, -to_target.z), min(1.0, delta * 10.0))
     move_and_slide()
     if animator:
         animator.update_locomotion(get_horizontal_speed())

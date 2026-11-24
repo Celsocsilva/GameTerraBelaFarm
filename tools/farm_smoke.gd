@@ -190,7 +190,8 @@ func _check_throw_reach(world: FarmWorld) -> void:
             side_cells += 1
             _check(int(cell["row"]) >= 3, "Sulco vizinho só recebe semente mais à frente (%s)" % cell["id"])
     rows.sort()
-    _check(rows == [1, 2, 3, 4, 5, 6], "Deve semear do pé (fileira 1) até 5 plantas à frente (fileira 6), obtido %s" % [rows])
+    # SEED-004: nada sob os pés nem atrás; da próxima fileira até 5 à frente.
+    _check(rows == [2, 3, 4, 5, 6], "Deve semear da fileira à frente (2) até 5 plantas à frente (6), obtido %s" % [rows])
     _check(side_cells >= 2, "Leque deve alcançar sulcos vizinhos (obtido %d)" % side_cells)
     _check(planted.size() <= grid.seeds_per_step, "No máximo seeds_per_step covas por passo")
     # Próximo passo continua a faixa à frente, sem replantar.

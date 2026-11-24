@@ -88,7 +88,8 @@ func _test_planting_and_stages() -> void:
     var p: Vector3 = cell["position"]
     var before := grid.get_planting_progress()["planted"] as int
     for frame in 30:
-        world.farmer.global_position = Vector3(p.x, 1.0, p.z + float(frame) * 0.05)
+        # SEED-004: a semente vai sempre à frente; a cova fica à frente do caminho.
+        world.farmer.global_position = Vector3(p.x, 1.0, p.z - 2.5 + float(frame) * 0.05)
         grid.process_farmer_position(world.farmer.global_position, 0.05)
     _check(int(grid.get_planting_progress()["planted"]) > before, "andar no milharal não semeou")
     await create_timer(1.2).timeout

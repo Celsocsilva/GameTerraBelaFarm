@@ -108,7 +108,7 @@ func get_organic_offset(module_index: int, row: int, column: int) -> Vector2:
 static func _hash(module_index: int, row: int, column: int, salt: float) -> float:
     return fposmod(sin(float(module_index) * 91.7 + float(row) * 12.9898 + float(column) * 78.233 + salt * 37.719) * 43758.5453, 1.0)
 
-func process_farmer_position(world_position: Vector3, delta: float) -> void:
+func process_farmer_position(world_position: Vector3, delta: float, facing: Vector3 = Vector3.ZERO) -> void:
     if not _has_previous_position:
         _last_farmer_position = world_position
         _has_previous_position = true
@@ -118,7 +118,11 @@ func process_farmer_position(world_position: Vector3, delta: float) -> void:
     _plant_accumulator = 0.0
     var travel := world_position - _last_farmer_position
     var flat_travel := Vector3(travel.x, 0.0, travel.z)
-    if flat_travel.length() > 0.05:
+    var flat_facing := Vector3(facing.x, 0.0, facing.z)
+    if flat_facing.length() > 0.05:
+        # SEED-004: frente real do fazendeiro (sem atraso de 0,35 s ao virar).
+        _facing = flat_facing.normalized()
+    elif flat_travel.length() > 0.05:
         _facing = flat_travel.normalized()
     if not can_sow():
         _last_farmer_position = world_position
@@ -137,9 +141,10 @@ func get_seed_band_length() -> float:
 func get_seed_band_cells(origin: Vector3, facing: Vector3) -> Array[Dictionary]:
     var forward := Vector2(facing.x, facing.z)
     forward = forward.normalized() if forward.length() > 0.001 else Vector2(0.0, 1.0)
-    # SEED-003: semente sempre à frente. Só a cova sob os pés (centro até
-    # 1/4 de fileira atrás, por causa do desvio orgânico) e as da frente.
-    var band_start := -0.25 * _row_step
+    # SEED-004: semente sempre à frente. A faixa começa ~uma fileira à frente
+    # dos pés (a mão fica ~0,45 m à frente do corpo): nenhuma cova sob ou atrás
+    # do fazendeiro recebe semente, senão o punhado voltaria pelas costas.
+    var band_start := 0.8 * _row_step
     var band_end := get_seed_band_length()
     var candidates: Array = []
     for cell in cells.values():

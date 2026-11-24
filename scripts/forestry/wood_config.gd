@@ -14,15 +14,13 @@ const LOGS_PER_BUNDLE := 8
 ## O tomate vale 3 por caixa de 8; um fardo exige cortar 2 árvores.
 const PRICE_PER_BUNDLE := 6
 ## Golpes de machado até a árvore inclinar (FV-WOOD-002). Cada golpe é um
-## ciclo da animação do machado (axe_only_animation.gif, 8 quadros, 0,89 s) e
-## avança um estágio: 1º entalhe, 2º corte fundo, 3º inclinação.
+## ciclo do golpe do fazendeiro (CHOP_SWING_SECONDS) e avança um estágio:
+## 1º entalhe, 2º corte fundo, 3º inclinação.
 const CHOP_HITS := 3
-## Duração (ms) de cada quadro do machado, a mesma do GIF original.
-const AXE_FRAME_MS: Array[int] = [110, 110, 120, 80, 90, 120, 120, 140]
-## Quadro (0 = primeiro) em que a lâmina bate no tronco.
-const AXE_IMPACT_FRAME := 2
-## Velocidade da animação do machado (1,0 = a do GIF).
-const AXE_SPEED := 1.0
+## CHOP-002: ciclo de um golpe do fazendeiro (erguer, descer, voltar) e o
+## instante do impacto da lâmina no tronco, dentro do ciclo.
+const CHOP_SWING_SECONDS := 1.0
+const CHOP_IMPACT_SECONDS := 0.55
 ## Segundos entre a árvore inclinada e a árvore caída no chão.
 const FALL_SECONDS := 0.35
 ## Segundos entre a árvore caída e o toco com as toras (quando as toras saem).
