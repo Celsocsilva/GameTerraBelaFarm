@@ -9,30 +9,34 @@ class_name SeedThrow
 ## Emitido quando o centro do punhado toca o solo (após flight_time).
 signal landed(target: Vector3)
 
-@export_range(0.4, 1.4, 0.05) var flight_time: float = 0.85
-@export var gravity: Vector3 = Vector3(0.0, -9.8, 0.0)
+## SEED-003: lançamento rasteiro. Voo curto e gravidade baixa: o punhado sai
+## da mão na altura da cintura e corre quase rente ao chão até o sulco (o
+## FarmWorld ajusta flight_time pela distância de cada punhado).
+@export_range(0.2, 1.4, 0.05) var flight_time: float = 0.5
+@export var gravity: Vector3 = Vector3(0.0, -4.5, 0.0)
 ## 1.0 solta tudo no mesmo quadro; valores menores escalonam o punhado.
 @export_range(0.5, 1.0, 0.01) var release_explosiveness: float = 0.86
 
 @export_group("Grãos principais")
-## SEED-002: grãos menores (eram 0,65–1,45) e um punhado mais aberto.
+## SEED-003: grãos ainda menores (SEED-002 era 0,4–0,85) e um punhado mais
+## fechado, que não sobe.
 @export_range(4, 24, 1) var seed_amount: int = 8
-@export_range(0.2, 1.6, 0.05) var seed_scale_min: float = 0.4
-@export_range(0.2, 1.6, 0.05) var seed_scale_max: float = 0.85
-@export_range(0.0, 45.0, 1.0) var spread_degrees: float = 18.0
+@export_range(0.1, 1.6, 0.01) var seed_scale_min: float = 0.22
+@export_range(0.1, 1.6, 0.01) var seed_scale_max: float = 0.45
+@export_range(0.0, 45.0, 1.0) var spread_degrees: float = 10.0
 ## Variação de força (0.15 = ±15%), espalha a queda ao redor do alvo.
 @export_range(0.0, 0.5, 0.01) var velocity_variation: float = 0.15
 
 @export_group("Grãos finos")
 @export_range(0, 48, 1) var fine_amount: int = 20
-@export_range(0.03, 1.0, 0.01) var fine_scale_min: float = 0.07
-@export_range(0.1, 1.0, 0.05) var fine_scale_max: float = 0.35
-@export_range(0.0, 60.0, 1.0) var fine_spread_degrees: float = 36.0
+@export_range(0.02, 1.0, 0.01) var fine_scale_min: float = 0.04
+@export_range(0.05, 1.0, 0.01) var fine_scale_max: float = 0.18
+@export_range(0.0, 60.0, 1.0) var fine_spread_degrees: float = 22.0
 @export_range(0.0, 0.5, 0.01) var fine_velocity_variation: float = 0.3
 
 @export_group("Grãos no solo")
 @export_range(0, 40, 1) var ground_grain_count: int = 14
-@export_range(0.1, 2.0, 0.05) var ground_scatter_radius: float = 1.25
+@export_range(0.1, 2.0, 0.05) var ground_scatter_radius: float = 0.9
 ## SEED-002: o rastro de grãos no solo é alongado na direção do arremesso
 ## (elipse), como a semente lançada a lanço que "escorre" para a frente.
 @export_range(1.0, 3.0, 0.05) var ground_scatter_stretch: float = 1.6
