@@ -198,7 +198,13 @@ const COW_SHOP_GAP := 1.0
 ## Mochila nas costas do fazendeiro (a frente do fazendeiro é -Z local).
 const BACKPACK_OFFSET := Vector3(0.0, 1.1, 0.62)
 
-const SEED_HAND_OFFSET := Vector3(0.45, 1.15, -0.25)
+## SEED-003: mão que semeia, no espaço do fazendeiro (frente = -Z local):
+## à direita, na altura da cintura e à frente do corpo, para o punhado sair
+## sempre na direção em que ele anda e voar rasteiro.
+const SEED_HAND_OFFSET := Vector3(0.3, 0.7, -0.45)
+## Duração do voo do punhado: base + por metro (rasteiro, sem "bala" nos longes).
+const SEED_FLIGHT_BASE := 0.28
+const SEED_FLIGHT_PER_M := 0.075
 ## SEED-002: desvio aleatório do pouso do punhado (m) e atraso por metro entre
 ## os punhados de um mesmo passo (perto primeiro, longe depois).
 const SEED_TARGET_JITTER := 0.3
@@ -399,6 +405,7 @@ func _process(delta: float) -> void:
         planting_grid.process_farmer_position(farmer.global_position, delta)
         for grid in crop_grids.values():
             (grid as PlantingGrid).process_farmer_position(farmer.global_position, delta)
+        farmer.sowing = is_farmer_sowing()
     if sales_counter and farmer:
         sales_counter.process_farmer_position(farmer.global_position, get_farmer_hands_position())
     if money_stack and farmer:
@@ -425,6 +432,15 @@ func _process(delta: float) -> void:
         _update_wood_hint()
     if farmer and harvest_inventory:
         _update_crop_busy_hint()
+
+## SOW-SPEED-001: o fazendeiro está sobre um canteiro semeando (anda mais devagar).
+func is_farmer_sowing() -> bool:
+    var facing := -farmer.global_basis.z
+    facing.y = 0.0
+    for grid in get_all_grids():
+        if grid.is_sowing_at(farmer.global_position, facing):
+            return true
+    return false
 
 func get_farmer_hands_position() -> Vector3:
     return farmer.global_transform * HANDS_OFFSET
@@ -1123,13 +1139,14 @@ func _on_grid_cell_planted(cell_id: String) -> void:
     add_child(seed_throw)
     # O broto nasce quando o punhado toca o sulco, não no momento do arremesso.
     seed_throw.landed.connect(_spawn_crop.bind(cell_id), CONNECT_ONE_SHOT)
-    var origin: Vector3 = _seed_origin_override if _seed_origin_override is Vector3 else farmer.global_position + SEED_HAND_OFFSET
+    var origin: Vector3 = _seed_origin_override if _seed_origin_override is Vector3 else farmer.global_transform * SEED_HAND_OFFSET
     # SEED-002: semeadura a lanço. O punhado pousa um pouco fora do centro da
     # cova (o broto nasce na cova) e os punhados de um mesmo passo saem em
     # sequência, dos mais perto aos mais longe, num gesto só.
     var target: Vector3 = cell["position"] + Vector3(randf_range(-SEED_TARGET_JITTER, SEED_TARGET_JITTER), 0.2, randf_range(-SEED_TARGET_JITTER, SEED_TARGET_JITTER))
     var distance := Vector2(target.x - origin.x, target.z - origin.z).length()
     var delay := 0.0 if _seed_origin_override is Vector3 else clampf(distance * SEED_SWEEP_DELAY_PER_M + randf() * 0.06, 0.0, 0.45)
+    seed_throw.flight_time = clampf(SEED_FLIGHT_BASE + distance * SEED_FLIGHT_PER_M, 0.3, 0.75)
     seed_throw.launch(origin, target, delay)
 
 ## Semeia uma cova a partir de outro ponto (mãos do ajudante). Mesmo fluxo da

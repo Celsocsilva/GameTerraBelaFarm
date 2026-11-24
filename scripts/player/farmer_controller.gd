@@ -5,6 +5,11 @@ class_name FarmerController
 @export var acceleration: float = 18.0
 @export var deceleration: float = 24.0
 @export var gravity: float = 18.0
+## SOW-SPEED-001: fração da velocidade enquanto semeia sobre o canteiro (o
+## FarmWorld liga `sowing`). A troca é suave para não dar tranco.
+@export_range(0.2, 1.0, 0.05) var sowing_speed_factor: float = 0.55
+var sowing := false
+var _speed_factor := 1.0
 @export var joystick_path: NodePath = NodePath("../HUD/VirtualJoystick")
 
 var _joystick: Control
@@ -30,7 +35,8 @@ func _process(delta: float) -> void:
     if _joystick == null:
         _joystick = get_node_or_null("../HUD/VirtualJoystick")
     var input_vector := _read_input()
-    var target := Vector3(input_vector.x, 0.0, input_vector.y) * move_speed
+    _speed_factor = move_toward(_speed_factor, sowing_speed_factor if sowing else 1.0, delta * 2.5)
+    var target := Vector3(input_vector.x, 0.0, input_vector.y) * move_speed * _speed_factor
     var rate := acceleration if input_vector.length_squared() > 0.001 else deceleration
     velocity.x = move_toward(velocity.x, target.x, rate * delta)
     velocity.z = move_toward(velocity.z, target.z, rate * delta)

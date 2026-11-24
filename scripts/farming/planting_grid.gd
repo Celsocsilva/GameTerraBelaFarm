@@ -137,7 +137,9 @@ func get_seed_band_length() -> float:
 func get_seed_band_cells(origin: Vector3, facing: Vector3) -> Array[Dictionary]:
     var forward := Vector2(facing.x, facing.z)
     forward = forward.normalized() if forward.length() > 0.001 else Vector2(0.0, 1.0)
-    var band_start := -0.5 * _row_step
+    # SEED-003: semente sempre à frente. Só a cova sob os pés (centro até
+    # 1/4 de fileira atrás, por causa do desvio orgânico) e as da frente.
+    var band_start := -0.25 * _row_step
     var band_end := get_seed_band_length()
     var candidates: Array = []
     for cell in cells.values():
@@ -231,6 +233,17 @@ func reopen_harvested() -> int:
             cell_state_changed.emit(cell["id"], "EMPTY")
             count += 1
     return count
+
+## SOW-SPEED-001: o fazendeiro está semeando aqui — em cima do canteiro (a
+## menos de uma cova de alguma cova), a semeadura liberada e ainda há cova
+## vazia na faixa à frente dele.
+func is_sowing_at(world_pos: Vector3, facing: Vector3 = Vector3.ZERO) -> bool:
+    if get_cell_at_world(world_pos).is_empty():
+        return false
+    if not can_sow():
+        return false
+    var forward := facing if facing.length() > 0.001 else _facing
+    return not get_seed_band_cells(world_pos, forward).is_empty()
 
 func can_sow() -> bool:
     if sow_gate.is_valid():

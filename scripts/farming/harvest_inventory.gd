@@ -14,6 +14,12 @@ signal backpack_full()
 ## Item padrão. A mochila aceita só um produto por vez (FV-WOOD-001: tomate
 ## OU toras de madeira); can_accept() diz se outro produto já ocupa a mochila.
 const DEFAULT_ITEM := &"tomato"
+## PUMPKIN-CARRY-001 (pedido do Celso): limite por transporte de alguns
+## produtos, em unidades (abóbora: no máximo 7 por viagem). Os demais usam
+## max_crates * units_per_crate.
+const ITEM_MAX_UNITS := {&"pumpkin": 7}
+## Unidades por "caixa" desenhada na mochila: cada abóbora aparece sozinha.
+const ITEM_UNITS_PER_CRATE := {&"pumpkin": 1}
 
 @export_range(1, 7, 1) var max_crates: int = 7
 @export_range(1, 64, 1) var units_per_crate: int = 8
@@ -36,8 +42,25 @@ class Reservation:
     func is_valid() -> bool:
         return id > 0 and amount > 0
 
-func get_capacity() -> int:
-    return max_crates * units_per_crate
+## Capacidade para `item_id` (vazio = produto que está na mochila agora).
+func get_capacity(item_id: StringName = &"") -> int:
+    var item := item_id if item_id != &"" else get_current_item()
+    return int(ITEM_MAX_UNITS.get(item, max_crates * units_per_crate))
+
+## Unidades por caixa desenhada de `item_id` (abóbora = 1 por imagem).
+func get_units_per_crate(item_id: StringName = &"") -> int:
+    var item := item_id if item_id != &"" else get_current_item()
+    return int(ITEM_UNITS_PER_CRATE.get(item, units_per_crate))
+
+## Produto na mochila (ou a caminho dela); DEFAULT_ITEM se estiver vazia.
+func get_current_item() -> StringName:
+    for key in _amounts:
+        if int(_amounts[key]) > 0:
+            return key
+    for reservation in _reservations.values():
+        if (reservation as Reservation).pending() > 0:
+            return (reservation as Reservation).item_id
+    return DEFAULT_ITEM
 
 func get_amount(item_id: StringName = DEFAULT_ITEM) -> int:
     return int(_amounts.get(item_id, 0))
@@ -55,8 +78,8 @@ func get_reserved_total() -> int:
     return total
 
 ## Espaço livre considerando o que já está voando para a mochila.
-func get_free_capacity() -> int:
-    return maxi(0, get_capacity() - get_total() - get_reserved_total())
+func get_free_capacity(item_id: StringName = &"") -> int:
+    return maxi(0, get_capacity(item_id) - get_total() - get_reserved_total())
 
 func is_full() -> bool:
     return get_total() >= get_capacity()
@@ -66,10 +89,10 @@ func get_pending_reservation_count() -> int:
 
 ## Caixas visíveis: ceil(total / units_per_crate), limitado a max_crates.
 func get_crate_count() -> int:
-    return mini(max_crates, int(ceil(float(get_total()) / float(units_per_crate))))
+    return mini(max_crates, int(ceil(float(get_total()) / float(get_units_per_crate()))))
 
 func get_full_crate_count() -> int:
-    return mini(max_crates, get_total() / units_per_crate)
+    return mini(max_crates, get_total() / get_units_per_crate())
 
 ## Verdadeiro se nenhum OUTRO produto está na mochila ou a caminho dela.
 func can_accept(item_id: StringName) -> bool:
@@ -87,7 +110,7 @@ func can_accept(item_id: StringName) -> bool:
 func try_reserve(item_id: StringName, amount: int) -> Reservation:
     var reservation := Reservation.new()
     reservation.item_id = item_id
-    reservation.amount = mini(maxi(amount, 0), get_free_capacity()) if can_accept(item_id) else 0
+    reservation.amount = mini(maxi(amount, 0), get_free_capacity(item_id)) if can_accept(item_id) else 0
     if reservation.amount <= 0:
         reservation.amount = 0
         return reservation
@@ -134,7 +157,7 @@ func remove(item_id: StringName, amount: int) -> int:
 
 ## Estado definido diretamente (testes, carga de save). Ignora reservas abertas.
 func set_amount(item_id: StringName, amount: int) -> void:
-    _amounts[item_id] = clampi(amount, 0, get_capacity())
+    _amounts[item_id] = clampi(amount, 0, get_capacity(item_id))
     amount_changed.emit(item_id, get_amount(item_id))
 
 ## Reservas pendentes não são persistidas: o fruto ainda está na planta.
@@ -149,6 +172,6 @@ func from_dict(data: Dictionary) -> void:
     _reservations.clear()
     var amounts: Dictionary = data.get("amounts", {})
     for key in amounts:
-        _amounts[StringName(key)] = clampi(int(amounts[key]), 0, get_capacity())
+        _amounts[StringName(key)] = clampi(int(amounts[key]), 0, get_capacity(StringName(key)))
     for key in _amounts:
         amount_changed.emit(key, get_amount(key))

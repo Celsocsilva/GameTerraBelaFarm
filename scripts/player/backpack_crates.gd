@@ -80,8 +80,13 @@ func get_full_crate_count() -> int:
 
 ## Mini tomates visíveis na caixa parcial do topo (0 se não houver parcial).
 func get_partial_fill() -> int:
-    var remainder := _amount % units_per_crate
-    return remainder if _amount < max_crates * units_per_crate else 0
+    var per_crate := _units_per_crate()
+    var remainder := _amount % per_crate
+    return remainder if _amount < max_crates * per_crate else 0
+
+## PUMPKIN-CARRY-001: cada abóbora é uma imagem na pilha (até 7).
+func _units_per_crate() -> int:
+    return int(HarvestInventory.ITEM_UNITS_PER_CRATE.get(item_id, units_per_crate))
 
 ## Contrato do FV-HARVEST-001. Atualiza a pilha de forma incremental.
 ## FV-WOOD-001: a mochila leva um produto por vez; quando outro produto chega
@@ -93,12 +98,13 @@ func set_amount(new_item_id: StringName, amount: int) -> void:
         item_id = new_item_id
         _amount = 0
     var previous := _amount
-    _amount = clampi(amount, 0, max_crates * units_per_crate)
+    _amount = clampi(amount, 0, max_crates * _units_per_crate())
     _refresh(_amount != previous)
 
 func _refresh(animate: bool) -> void:
-    var crate_count := mini(max_crates, int(ceil(float(_amount) / float(units_per_crate))))
-    var full_count := mini(max_crates, _amount / units_per_crate)
+    var per_crate := _units_per_crate()
+    var crate_count := mini(max_crates, int(ceil(float(_amount) / float(per_crate))))
+    var full_count := mini(max_crates, _amount / per_crate)
     for index in _crates.size():
         var crate := _crates[index]
         var was_visible := crate.visible
@@ -108,8 +114,8 @@ func _refresh(animate: bool) -> void:
         crate.visible = visible_now
         crate.set_meta("full", full_now)
         var sprite := crate.get_node("CrateSprite") as Sprite3D
-        var fill := 0 if full_now or not visible_now else _amount - index * units_per_crate
-        sprite.texture = ItemArt.full_texture(item_id) if full_now else ItemArt.partial_texture(item_id, fill, units_per_crate)
+        var fill := 0 if full_now or not visible_now else _amount - index * per_crate
+        sprite.texture = ItemArt.full_texture(item_id) if full_now else ItemArt.partial_texture(item_id, fill, per_crate)
         sprite.pixel_size = crate_width * ItemArt.width_scale(item_id) / float(sprite.texture.get_width())
         sprite.offset = Vector2(-sprite.texture.get_width() * 0.5, 0.0)
         if not ItemArt.has_partial_fill(item_id):
@@ -124,7 +130,7 @@ func _refresh(animate: bool) -> void:
         if animate and visible_now and (not was_visible or full_now != was_full):
             _pop(sprite, 0.22)
     # Destino dos frutos: logo acima da caixa que está recebendo tomates.
-    var receiving := mini(crate_count, max_crates - 1) if _amount % units_per_crate == 0 else crate_count - 1
+    var receiving := mini(crate_count, max_crates - 1) if _amount % per_crate == 0 else crate_count - 1
     var receiving_slot := _slot_position(maxi(receiving, 0), crate_count)
     intake_marker.position = receiving_slot + Vector3(0.0, crate_width * 0.55, 0.0)
     _orient_crates()
