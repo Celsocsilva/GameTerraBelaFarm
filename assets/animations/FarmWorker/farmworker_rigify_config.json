@@ -1,0 +1,280 @@
+{
+  "name": "FarmWorker",
+  "mesh": "C:\\Users\\Celso\\OneDrive\\Documentos\\ChatGPT\\GAME TERRABELA FARM\\assets\\animations\\FarmWorker\\source\\farmworker_lowpoly.glb",
+  "basecolor": "C:\\Users\\Celso\\OneDrive\\Documentos\\ChatGPT\\GAME TERRABELA FARM\\assets\\animations\\FarmWorker\\textures\\farmworker_basecolor.png",
+  "ual": "C:\\Users\\Celso\\OneDrive\\Documentos\\ChatGPT\\GAME TERRABELA FARM\\assets\\animations\\Universal Animation Library[Standard]\\Unreal-Godot\\UAL1_Standard.glb",
+  "out_dir": "C:\\Users\\Celso\\OneDrive\\Documentos\\ChatGPT\\GAME TERRABELA FARM\\assets\\animations\\FarmWorker",
+  "weld_distance": 1e-05,
+  "target_tris": 6500,
+  "texture_size": 1024,
+  "roughness": 0.85,
+  "elbow_back_offset": 0.012,
+  "single_neck": true,
+  "solver_passes": 2,
+  "landmarks": {
+    "pelvis": [
+      0,
+      0.0,
+      0.42
+    ],
+    "neck_base": [
+      0,
+      0.0,
+      0.72
+    ],
+    "head_base": [
+      0,
+      -0.005,
+      0.755
+    ],
+    "head_top": [
+      0,
+      -0.005,
+      0.99
+    ],
+    "clav_head": [
+      0.02,
+      -0.005,
+      0.7
+    ],
+    "shoulder": [
+      0.09,
+      0.005,
+      0.675
+    ],
+    "elbow": [
+      0.175,
+      0.005,
+      0.67
+    ],
+    "wrist": [
+      0.255,
+      0.005,
+      0.665
+    ],
+    "hand_tip": [
+      0.35,
+      0.005,
+      0.652
+    ],
+    "hip": [
+      0.065,
+      0.0,
+      0.39
+    ],
+    "knee": [
+      0.09,
+      0.01,
+      0.22
+    ],
+    "ankle": [
+      0.1,
+      0.035,
+      0.1
+    ],
+    "ball": [
+      0.1,
+      -0.065,
+      0.035
+    ],
+    "toe": [
+      0.1,
+      -0.13,
+      0.03
+    ]
+  },
+  "animations": [
+    {
+      "name": "Idle_Loop",
+      "from": "Idle_Loop"
+    },
+    {
+      "name": "Idle_Talking_Loop",
+      "from": "Idle_Talking_Loop"
+    },
+    {
+      "name": "Walk_Loop",
+      "from": "Walk_Loop"
+    },
+    {
+      "name": "Jog_Fwd_Loop",
+      "from": "Jog_Fwd_Loop"
+    },
+    {
+      "name": "Sprint_Loop",
+      "from": "Sprint_Loop"
+    },
+    {
+      "name": "Carry_Idle_Loop",
+      "from": "Idle_Loop",
+      "pose_override": {
+        "upperarm_l": [
+          -30,
+          20,
+          0
+        ],
+        "lowerarm_l": [
+          -80,
+          20,
+          0
+        ],
+        "hand_l": [
+          -80,
+          20,
+          0
+        ]
+      }
+    },
+    {
+      "name": "Carry_Walk_Loop",
+      "from": "Walk_Loop",
+      "pose_override": {
+        "upperarm_l": [
+          -30,
+          20,
+          0
+        ],
+        "lowerarm_l": [
+          -80,
+          20,
+          0
+        ],
+        "hand_l": [
+          -80,
+          20,
+          0
+        ]
+      }
+    },
+    {
+      "name": "Backpack_Idle_Loop",
+      "from": "Idle_Loop",
+      "pose_override": {
+        "upperarm_l": [
+          -8,
+          8,
+          0
+        ],
+        "lowerarm_l": [
+          -118,
+          -15,
+          0
+        ],
+        "hand_l": [
+          -110,
+          -15,
+          0
+        ]
+      }
+    },
+    {
+      "name": "Backpack_Walk_Loop",
+      "from": "Walk_Loop",
+      "pose_override": {
+        "upperarm_l": [
+          -8,
+          8,
+          0
+        ],
+        "lowerarm_l": [
+          -118,
+          -15,
+          0
+        ],
+        "hand_l": [
+          -110,
+          -15,
+          0
+        ]
+      }
+    },
+    {
+      "name": "Backpack_Jog_Loop",
+      "from": "Jog_Fwd_Loop",
+      "pose_override": {
+        "upperarm_l": [
+          -8,
+          8,
+          0
+        ],
+        "lowerarm_l": [
+          -118,
+          -15,
+          0
+        ],
+        "hand_l": [
+          -110,
+          -15,
+          0
+        ]
+      }
+    },
+    {
+      "name": "Interact",
+      "from": "Interact"
+    },
+    {
+      "name": "PickUp_Table",
+      "from": "PickUp_Table"
+    },
+    {
+      "name": "Fixing_Kneeling",
+      "from": "Fixing_Kneeling"
+    },
+    {
+      "name": "Crouch_Idle_Loop",
+      "from": "Crouch_Idle_Loop"
+    },
+    {
+      "name": "Crouch_Fwd_Loop",
+      "from": "Crouch_Fwd_Loop"
+    },
+    {
+      "name": "Push_Loop",
+      "from": "Push_Loop"
+    },
+    {
+      "name": "Sitting_Enter",
+      "from": "Sitting_Enter"
+    },
+    {
+      "name": "Sitting_Idle_Loop",
+      "from": "Sitting_Idle_Loop"
+    },
+    {
+      "name": "Sitting_Exit",
+      "from": "Sitting_Exit"
+    },
+    {
+      "name": "Driving_Loop",
+      "from": "Driving_Loop"
+    },
+    {
+      "name": "Jump_Start",
+      "from": "Jump_Start"
+    },
+    {
+      "name": "Jump_Loop",
+      "from": "Jump_Loop"
+    },
+    {
+      "name": "Jump_Land",
+      "from": "Jump_Land"
+    },
+    {
+      "name": "Dance_Loop",
+      "from": "Dance_Loop"
+    },
+    {
+      "name": "Hit_Chest",
+      "from": "Hit_Chest"
+    }
+  ],
+  "head_rigid": {
+    "z0": 0.745,
+    "z1": 0.775,
+    "brim_z": 0.73,
+    "brim_r": 0.13
+  },
+  "arms_from_rest": true
+}

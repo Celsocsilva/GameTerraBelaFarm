@@ -1,9 +1,9 @@
 extends SceneTree
 ## FARMER-RIG-001 — valida o fazendeiro rigado (Rigify -> esqueleto de jogo padrão) no Godot.
-##   godot --headless --path . -s tools/farmer_rig_smoke.gd
+##   godot --headless --path . -s tools/farmer_rig_smoke.gd [-- --scene=res://.../x_character.tscn --max-texture=1024]
 ## Sai com código 1 se algo falhar.
 
-const SCENE := "res://assets/animations/Farmer/farmer_character.tscn"
+var SCENE := "res://assets/animations/Farmer/farmer_character.tscn"
 const BONES := [
     "root", "pelvis", "spine_01", "spine_02", "spine_03", "neck_01", "head",
     "clavicle_l", "upperarm_l", "lowerarm_l", "hand_l",
@@ -17,7 +17,7 @@ const REQUIRED_ANIMS := [
     "Fixing_Kneeling", "PickUp_Table", "Interact", "Crouch_Idle_Loop", "Crouch_Fwd_Loop",
 ]
 const MAX_TRIS := 6500
-const MAX_TEXTURE := 512
+var MAX_TEXTURE := 512
 
 var failures: Array[String] = []
 
@@ -43,6 +43,11 @@ func _find(node: Node, cls: String) -> Node:
 
 
 func _run() -> void:
+    for a in OS.get_cmdline_user_args():
+        if a.begins_with("--scene="):
+            SCENE = a.substr(8)
+        elif a.begins_with("--max-texture="):
+            MAX_TEXTURE = int(a.substr(14))
     var packed := load(SCENE) as PackedScene
     _check(packed != null, "cena carrega: " + SCENE)
     if packed == null:

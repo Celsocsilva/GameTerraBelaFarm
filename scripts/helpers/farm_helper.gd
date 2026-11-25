@@ -17,6 +17,16 @@ signal planted(cell_id: String)
 
 ## Corpo-cápsula dos NPCs (era a cápsula do fazendeiro antes do modelo 3D, FARMER-GAME-001).
 const FARMER_SCENE := preload("res://scenes/npc/npc_capsule_body.tscn")
+## HELPER-WORKER-001: a trabalhadora rural 3D (rig no padrão do jogo, mesmas
+## animações e FarmerAnimator do fazendeiro) é a ajudante do canteiro de tomates.
+## Carregada com load() na hora de criar (NÃO preload): com preload a cena entrava na
+## carga em threads da tela de carregamento junto com o farmer.tscn, os dois puxavam o
+## mesmo FarmerAnimator ao mesmo tempo e a carga falhava (jogo preso no carregamento).
+const WORKER_SCENE_PATH := "res://assets/animations/FarmWorker/farmworker_character.tscn"
+## Mesma escala do fazendeiro em scenes/player/farmer.tscn (modelo de 1 m -> 2,5 m).
+const WORKER_SCALE := 2.5
+## Caixa nas mãos (pose Carry_*): na altura e à frente das mãos do modelo em escala 2,5.
+const WORKER_CARRY_OFFSET := Vector3(0.0, 1.05, -0.62)
 const CRATE_FULL_TEXTURE := preload("res://assets/harvest/crate_full.png")
 const CRATE_EMPTY_TEXTURE := preload("res://assets/harvest/crate_empty.png")
 const PICKUP_FX_SCRIPT := preload("res://scripts/vfx/tomato_pickup_fx.gd")
@@ -52,11 +62,25 @@ var _carry_visual: Node3D
 var _carry_sprite: Sprite3D
 var _camera: Camera3D
 var _retry := 0.0
+## Modelo 3D e animador (só na ajudante com personagem; null na cápsula).
+var visual: Node3D
+var animator: FarmerAnimator
+var _last_position := Vector3.ZERO
 
 ## Monta o ajudante copiando os meshes do fazendeiro e recolorindo-os.
-static func create() -> FarmHelper:
+static func create(use_worker := false) -> FarmHelper:
     var helper := FarmHelper.new()
     helper.name = "FarmHelper"
+    if use_worker:
+        var worker := (load(WORKER_SCENE_PATH) as PackedScene).instantiate() as Node3D
+        worker.name = "Visual"
+        worker.scale = Vector3.ONE * WORKER_SCALE
+        helper.add_child(worker)
+        helper.visual = worker
+        helper.animator = worker.get_node_or_null("FarmerAnimator") as FarmerAnimator
+        if helper.animator:
+            helper.animator.model_scale = WORKER_SCALE
+        return helper
     var template := FARMER_SCENE.instantiate()
     for child in template.get_children():
         if child is MeshInstance3D:
@@ -84,7 +108,7 @@ func setup(p_grid: PlantingGrid, crop_map: Dictionary, p_pile: TomatoPile, p_hir
 func _ready() -> void:
     _carry_visual = Node3D.new()
     _carry_visual.name = "CarriedCrate"
-    _carry_visual.position = Vector3(0.0, 0.75, -0.6)
+    _carry_visual.position = WORKER_CARRY_OFFSET if animator else Vector3(0.0, 0.75, -0.6)
     add_child(_carry_visual)
     _carry_sprite = Sprite3D.new()
     _carry_sprite.name = "CrateSprite"
@@ -120,6 +144,7 @@ func _on_grade_changed(grade: int) -> void:
     set_process(grade > 0)
     if grade > 0 and not was_visible:
         global_position = get_idle_point()
+        _last_position = global_position
         _set_state(IDLE)
 
 func _process(delta: float) -> void:
@@ -151,11 +176,25 @@ func _process(delta: float) -> void:
             elif _walk_to(_target, delta):
                 _set_state(PLANTING)
                 _work_left = HelperConfig.PLANT_SECONDS
+                if animator:
+                    animator.play_sow()
         PLANTING:
             _work_left -= delta
             if _work_left <= 0.0:
                 _plant_target()
     _update_carry_visual()
+    _update_animation(delta)
+
+## HELPER-WORKER-001: locomoção pela velocidade real do quadro; caixa nas mãos
+## (Carry_*) quando leva tomates. Os gestos são disparados nos eventos.
+func _update_animation(delta: float) -> void:
+    if animator == null:
+        return
+    var moved := global_position - _last_position
+    moved.y = 0.0
+    _last_position = global_position
+    animator.carrying_front = carried > 0
+    animator.update_locomotion(moved.length() / maxf(delta, 0.0001) if delta > 0.0 else 0.0)
 
 ## Decide a próxima tarefa a partir do estado atual do canteiro.
 func _choose_task() -> void:
@@ -223,6 +262,9 @@ func _begin_harvest() -> void:
         return
     _set_state(HARVESTING)
     _work_left = HelperConfig.harvest_seconds(hiring.grade)
+    if animator:
+        animator.update_locomotion(0.0)
+        animator.play_harvest()
     var crop: CropPlant = crops.get(target_cell)
     if crop and is_instance_valid(crop):
         crop.play_harvest_shake()
@@ -255,6 +297,8 @@ func _drop_at_pile() -> void:
     carried -= accepted
     if accepted > 0:
         dropped.emit(accepted)
+        if animator:
+            animator.play_deliver()
     if carried > 0:
         _set_state(WAIT_PILE)
     else:

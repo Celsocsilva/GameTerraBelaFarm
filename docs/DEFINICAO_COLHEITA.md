@@ -81,3 +81,32 @@ PNG RGBA já recortados na pasta `assets/`:
 - `crate_stack_7_reference.png` — somente referência visual da capacidade máxima; **não** usar como pilha dinâmica.
 
 Estes sprites são artes 2D transparentes. A mochila e a coleta já usam os sprites no protótipo Godot; as caixas da mochila têm largura de 2,0 unidades do mundo (o dobro da largura anterior). A pilha usa duas colunas e distância vertical de 1,2 unidade entre fileiras, para manter sete caixas visíveis na câmera. O depósito monta caixas e tomates com malhas 3D. A validação visual deve sempre usar a câmera do jogo.
+
+## Regras vigentes (atualizado em 25/11/2026)
+
+### Ciclo de plantio — regra única para TODOS os cultivos (SOW-CYCLE-004)
+**Semear → desenvolver → amadurecer → colher tudo → só então reinicia.** Vale para tomate, milho, abóbora e qualquer cultivo novo (a regra está em `FarmWorld`, não em cada cultura). Cada cultivo tem o próprio ciclo; um não trava o outro.
+- **Semear:** com o canteiro vazio, o fazendeiro (ou a ajudante) semeia. A janela fica aberta enquanto ele continua semeando.
+- **Desenvolver:** quando alguma planta daquele cultivo sai do broto e a semeadura parou há mais de 3 s (`FarmWorld.SOW_SESSION_GRACE`), a janela fecha. Covas que ficaram vazias continuam vazias neste ciclo.
+- **Amadurecer / colher:** um pé maduro ou uma colheita também fecham a janela. Colheita parcial (mochila cheia, várias viagens) não libera nada.
+- **Reinicia:** só quando tudo o que foi plantado naquele cultivo estiver colhido; aí as covas reabrem (`EMPTY`) e o ciclo recomeça.
+- Código: `FarmWorld.can_sow_grid`, `is_harvest_phase`, `_on_crop_stage_changed`, `PlantingGrid.has_pending_crop` / `reopen_harvested`. Teste por cultivo: `tools/sow_rule_smoke.gd` (`SOW_STRICT_CYCLE_OK`).
+
+### Limite por viagem (mochila, um produto por vez)
+| Produto | Máximo por viagem | Peça desenhada | Código |
+| --- | --- | --- | --- |
+| Tomate | 7 caixas (56 tomates) | caixa de 8 | `HarvestInventory.max_crates` |
+| Milho | 7 caixas (56 espigas) | caixa de 8 | idem |
+| Abóbora | **5 abóboras** | 1 abóbora por peça | `HarvestInventory.PUMPKIN_MAX_UNITS` |
+| Madeira | **5 fardos** (40 toras = 10 eucaliptos) | fardo de 8 toras | `HarvestInventory.WOOD_MAX_BUNDLES` |
+
+Com a mochila cheia de toras, o corte não começa ("Mochila cheia: venda as toras no balcão"); descarregou no balcão, volta a cortar. O contador de caixas do HUD mostra o máximo do produto (ex.: 5/5). Testes: `tools/wood_smoke.gd`, `tools/sow_carry_smoke.gd`, `tools/pumpkin_smoke.gd`.
+
+### Balcão de vendas
+- Uma pilha vertical por produto, no máximo `SalesCounter.MAX_VISUAL_CRATES` (4) peças visíveis e o contador "xN" acima quando passa disso.
+- **Abóbora (PUMPKIN-STACK-001):** empilhada uma a uma (cada abóbora é uma peça), com a mesma altura e o mesmo contador "xN" das caixas de tomate. Preço e venda continuam por caixa de 8 unidades. Capturas: `tools/pumpkin_counter_capture.gd` → `docs/evidence/pumpkin-stack-001/`.
+
+### Contratação do ajudante (HIRE-FIX-002)
+- Primeiro nível do ajudante do tomate: 100 de dinheiro + 20 fardos de madeira, entregues na plataforma em qualquer ordem e em várias viagens (com 5 fardos por viagem, 4 viagens).
+- O dinheiro soma até 100/100 e fica guardado; quando o último fardo chega, a contratação sai na hora, sem cobrar mais nada (antes parava em 99/100 e travava em "falta 1" se a carteira zerasse). A loja de vacas segue a mesma regra (200/200 + milho).
+- A ajudante do canteiro de tomates é a trabalhadora rural 3D (`assets/animations/FarmWorker/`), com as animações do fazendeiro (andar, caixa nos braços, colher, semear, entregar). Teste `tools/helper_smoke.gd`, capturas `tools/helper_worker_capture.gd`.

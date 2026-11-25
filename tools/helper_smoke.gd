@@ -121,27 +121,37 @@ func _test_hiring_on_pad() -> void:
     _check(pad.flight_log.size() == first, "um maço voa por dinheiro")
     var grades: Array[int] = []
     pad.purchased.connect(func(g: int) -> void: grades.append(g))
-    # Sem os 20 fardos, para em 99/100: não gasta o último dinheiro nem libera.
+    # HIRE-FIX-002: sem os 20 fardos, o preço soma até 100/100 e fica guardado
+    # (não libera); a contratação sai quando os fardos completam.
     var t := 0.0
-    while hiring.paid < 99 and t < 5.0:
+    while hiring.paid < 100 and t < 5.0:
         _step_pad(0.02, true)
         t += 0.02
-    _check(hiring.grade == 0 and hiring.paid == 99 and wallet.get_balance() == 51, "material bloqueia em 99/100")
+    _check(hiring.grade == 0 and hiring.paid == 100 and wallet.get_balance() == 50 and hiring.is_waiting_material(), "material segura em 100/100: paid=%d saldo=%d" % [hiring.paid, wallet.get_balance()])
+    _check(pad.get_cost_text() == "0", "plataforma mostra preço quitado: " + pad.get_cost_text())
     _check(world.hud.get_banner_message().contains("20") and world.hud.get_banner_message().contains("Madeira"), "aviso de 20 fardos")
     # HIRE-FIX-001: estoque do balcão não conta; os fardos vêm da mochila.
     world.sales_counter.set_item_total(&"wood", 20 * world.harvest_inventory.units_per_crate)
     _step_pad(HelperPad.START_DELAY + 1.0, true)
     _check(hiring.grade == 0 and world.sales_counter.get_item_total(&"wood") == 160, "estoque do balcão não é consumido")
     world.sales_counter.set_item_total(&"wood", 0)
+    # O bug do Celso: a carteira zera antes de levar os fardos. Antes ficava preso em "falta 1".
+    var saved_balance := wallet.get_balance()
+    wallet.spend(saved_balance, &"test")
     await _deliver_wood_in_trips(pad, hiring)
+    # Contrata em cima da plataforma assim que o último fardo chega (sem gastar mais).
+    _check(hiring.grade == 1, "contratou ao completar os fardos com o preço já pago")
+    _check(world.hud.get_banner_message().begins_with("Ajudante contratado"), "aviso de contratação: " + world.hud.get_banner_message())
     _step_pad(0.1, false)
     _step_pad(HelperPad.START_DELAY + HelperPad.PAY_INTERVAL * 2.0, true)
     _check(grades.size() == 1 and grades[0] == 1 and hiring.grade == 1, "contratado ao completar 100: %s" % [grades])
-    _check(wallet.get_balance() + hiring.paid == 50, "custou exatamente 100: saldo %d" % wallet.get_balance())
-    _check(world.harvest_inventory.get_amount(&"wood") == world.harvest_inventory.units_per_crate, "consumiu exatamente 20 fardos (7+7+6, sobra 1 na mochila)")
+    _check(wallet.get_balance() == 0 and hiring.paid == 0, "contratou com a carteira vazia (preço já quitado): saldo %d" % wallet.get_balance())
+    wallet.add(saved_balance, &"test")
+    var per_trip := world.harvest_inventory.get_max_crates(&"wood")
+    var leftover := int(ceil(20.0 / float(per_trip))) * per_trip - 20
+    _check(world.harvest_inventory.get_amount(&"wood") == leftover * world.harvest_inventory.units_per_crate, "consumiu exatamente 20 fardos (viagens de %d, sobra %d na mochila)" % [per_trip, leftover])
     await process_frame
     _check(world.farm_helper.visible, "ajudante aparece")
-    _check(world.hud.get_banner_message().begins_with("Ajudante contratado"), "aviso de contratação")
     _check(pad.get_grade_text() == "Grau 1/5" and pad.get_grade_shown() == 1, "grau 1 na plataforma")
     # Continua em cima: cobra a próxima graduação até o saldo acabar.
     _step_pad(5.0, true)
@@ -162,20 +172,22 @@ func _test_hiring_on_pad() -> void:
         _check(pad.get_cost_text() == locale[3], "%s custo %s" % [locale[0], pad.get_cost_text()])
     print("HELPER_PAD_HIRING_OK first=%d grades=%s spent=3100 locales=pt_BR,es,en" % [first, grades])
 
-## HIRE-FIX-001: 3 viagens de 7/7/7 fardos (mochila com 7 caixas). Cada fardo
+## HIRE-FIX-001: viagens com a mochila cheia de fardos (WOOD-CARRY-001: 5 por viagem -> 5/5/5/5). Cada fardo
 ## sai da mochila, voa até o ícone de material e o contador "n/20" sobe.
 func _deliver_wood_in_trips(pad: HelperPad, hiring: HelperHiring) -> void:
     var inv := world.harvest_inventory
     var upc := inv.units_per_crate
     var log_before := pad.material_log.size()
     _check(pad.get_material_text() == "0/20", "contador inicial do material: " + pad.get_material_text())
-    for trip in 3:
-        inv.set_amount(&"wood", inv.get_capacity())
+    var per_trip := inv.get_max_crates(&"wood")
+    var trips := int(ceil(20.0 / float(per_trip)))
+    for trip in trips:
+        inv.set_amount(&"wood", inv.get_capacity(&"wood"))
         _step_pad(0.2, false)
         # Um fardo por intervalo, não tudo de uma vez.
         _step_pad(HelperPad.START_DELAY + HelperPad.MATERIAL_INTERVAL * 1.5, true)
         var carried_after_one := inv.get_amount(&"wood")
-        _check(carried_after_one == inv.get_capacity() - upc, "viagem %d: um fardo descarregado por vez (mochila %d)" % [trip, carried_after_one])
+        _check(carried_after_one == inv.get_capacity(&"wood") - upc, "viagem %d: um fardo descarregado por vez (mochila %d)" % [trip, carried_after_one])
         _check(pad.get_material_flying_count() >= 1, "viagem %d: fardo voando até a plataforma" % trip)
         var last: Dictionary = pad.material_log[pad.material_log.size() - 1]
         _check(last["item"] == &"wood" and int(last["units"]) == upc, "viagem %d: voo registrado do fardo" % trip)
@@ -184,15 +196,15 @@ func _deliver_wood_in_trips(pad: HelperPad, hiring: HelperHiring) -> void:
         # Deixa os voos pousarem (tweens reais) e confere o contador.
         await create_timer(HelperPad.MATERIAL_FLIGHT_TIME + 0.3).timeout
         await process_frame
-        var landed := mini(20, (trip + 1) * 7)
+        var landed := mini(20, (trip + 1) * per_trip)
         _check(pad.get_material_flying_count() == 0, "viagem %d: todos os fardos pousaram" % trip)
-        if trip < 2:
+        if trip < trips - 1:
             _check(pad.get_material_text() == "%d/20" % landed, "viagem %d: contador %s" % [trip, pad.get_material_text()])
             _check(hiring.material_units == landed * upc and hiring.grade == 0, "viagem %d: material guardado ao sair" % trip)
             _step_pad(1.0, false)
             _check(hiring.material_units == landed * upc, "viagem %d: sair da plataforma não devolve fardos" % trip)
     _check(pad.material_log.size() - log_before == 20, "20 fardos voaram: %d" % (pad.material_log.size() - log_before))
-    print("HELPER_MATERIAL_UNLOAD_OK flights=%d trips=3 left_in_backpack=%d" % [pad.material_log.size() - log_before, inv.get_amount(&"wood") / upc])
+    print("HELPER_MATERIAL_UNLOAD_OK flights=%d trips=%d left_in_backpack=%d" % [pad.material_log.size() - log_before, trips, inv.get_amount(&"wood") / upc])
 
 func _test_pad_layout() -> void:
     var pad := world.helper_pad

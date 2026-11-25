@@ -5,7 +5,7 @@ O rig de trabalho é feito no **Rigify** (Blender 5.3) e o jogo recebe um **esqu
 com nomes fixos, compatíveis com a **Universal Animation Library (UAL, Quaternius, CC0)** que está em
 `assets/animations/Universal Animation Library[Standard]/` e com o perfil humanoide do Godot.
 
-Primeiro personagem no padrão: `Farmer/` (ver `Farmer/README.md`).
+Personagens no padrão: `Farmer/` (ver `Farmer/README.md`) e `FarmWorker/` (trabalhadora rural, T-pose, ver `FarmWorker/README.md`).
 Pipeline automático: `tools/rigify_character_pipeline.py` (gera tudo a partir de um `config.json`).
 
 ---
@@ -149,6 +149,7 @@ config e rode o pipeline de novo. Uma animação feita à mão: anime os **contr
    ```
    "C:\Program Files\Blender Foundation\Blender 5.3\blender.exe" -b --factory-startup -P assets\animations\tools\rigify_character_pipeline.py -- <config.json>
    ```
+   Opções do config: `head_rigid` (chapéu/cabelo 100% na cabeça) e `arms_from_rest` (personagem em T-pose).
    Etapas: limpar/otimizar malha → metarig por landmarks → `rigify_generate` → pesos (bone heat, ≤ 4, normalizados)
    → esqueleto de jogo → retarget UAL → controles Rigify → bake → `.glb`. O log mostra o erro do retarget por animação.
 4. Prévia: `blender -b <out>\blender\<nome>_rigify.blend -P assets\animations\tools\render_character_preview.py -- <saida.png> Idle_Loop,Walk_Loop 4`

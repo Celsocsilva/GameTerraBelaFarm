@@ -126,6 +126,12 @@ func _build_extra_stacks() -> void:
         stack.item_id = item
         stack.centered = true
         stack.units_per_crate = units_per_crate
+        # PUMPKIN-STACK-001 (pedido do Celso, 25/11): abóboras empilhadas uma a uma
+        # (cada abóbora é uma "caixa", como na mochila), com a mesma altura máxima
+        # e o mesmo contador "xN" da pilha de caixas de tomate.
+        if item == &"pumpkin":
+            stack.units_per_crate = int(HarvestInventory.ITEM_UNITS_PER_CRATE.get(item, units_per_crate))
+            stack.visual_max_override = MAX_VISUAL_CRATES
         stack.crate_width = CRATE_WIDTH
         stack.max_crates = 999
         stack.position = Vector3(_item_slot_x(item), get_crate_base_height(), 0.0)
