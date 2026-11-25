@@ -1056,8 +1056,9 @@ func _build_planting_grid() -> void:
         crop_grids[crop] = grid
         entry["grid"] = grid
     for grid in get_all_grids():
-        grid.sow_gate = can_sow
-        grid.cell_state_changed.connect(_on_sow_cell_state)
+        grid.sow_gate = can_sow_grid.bind(grid)
+        grid.cell_state_changed.connect(_on_sow_cell_state.bind(grid))
+        grid.cell_planted.connect(_on_sow_cell_planted.bind(grid))
 
 ## FARM-005: todas as grades de plantio (tomate + culturas extras).
 func get_all_grids() -> Array[PlantingGrid]:
@@ -1068,35 +1069,89 @@ func get_all_grids() -> Array[PlantingGrid]:
         result.append(grid as PlantingGrid)
     return result
 
-## FARM-006: ciclo da semeadura. false = plantando (pode semear todo o
-## terreno); true = colhendo (começou a colheita em algum cultivo; ninguém
-## semeia até colher tudo o que foi plantado, em todos os cultivos).
-var harvest_phase := false
+## FARM-006 / SOW-CYCLE-002: ciclo da semeadura POR CULTIVO. Plantando: pode
+## semear todo o canteiro daquele cultivo. Começou a colher num cultivo: aquele
+## canteiro não recebe semente até colher tudo o que foi plantado nele; aí as
+## covas colhidas reabrem e o ciclo recomeça. Um cultivo não trava o outro
+## (antes, milho/abóbora ainda crescendo impediam replantar o tomate colhido).
+var _harvest_phase_by_grid: Dictionary = {}
 
-## FARM-005/006: pode semear agora?
-func can_sow() -> bool:
-    if not harvest_phase:
+## true se algum cultivo está na fase de colheita.
+var harvest_phase: bool:
+    get:
+        for grid in _harvest_phase_by_grid:
+            if _harvest_phase_by_grid[grid]:
+                return true
+        return false
+
+func is_harvest_phase(grid: PlantingGrid) -> bool:
+    return bool(_harvest_phase_by_grid.get(grid, false))
+
+## SOW-CYCLE-004 (regra do Celso, 25/11, vale para TODOS os cultivos):
+## semear -> desenvolver -> amadurecer -> colher tudo -> só então reinicia.
+## A janela de semeadura de um cultivo fica aberta enquanto o fazendeiro (ou a
+## ajudante) está semeando sem parar; ela fecha quando alguma planta daquele
+## cultivo começa a se desenvolver (sai do broto) e a semeadura parou há mais
+## de SOW_SESSION_GRACE segundos, ou quando algum pé amadurece/é colhido. Fechada,
+## nenhuma cova (nem vazia, nem já colhida) recebe semente até colher tudo o que
+## foi plantado naquele cultivo. Antes era possível voltar ao canteiro com as
+## plantas crescendo e semear as covas que tinham ficado vazias.
+const SOW_SESSION_GRACE := 3.0
+var _developed_by_grid: Dictionary = {}
+var _last_sow_by_grid: Dictionary = {}
+
+## Pode semear neste cultivo agora?
+func can_sow_grid(grid: PlantingGrid) -> bool:
+    if not is_harvest_phase(grid) and bool(_developed_by_grid.get(grid, false)):
+        var since := Time.get_ticks_msec() / 1000.0 - float(_last_sow_by_grid.get(grid, -INF))
+        if since > SOW_SESSION_GRACE:
+            _harvest_phase_by_grid[grid] = true
+    if not is_harvest_phase(grid):
         return true
-    _update_sow_phase()
-    return not harvest_phase
+    _update_sow_phase(grid)
+    return not is_harvest_phase(grid)
 
-## Fecha o ciclo de colheita quando nada plantado ficou por colher: as covas
-## colhidas de todos os cultivos reabrem e a semeadura volta.
-func _update_sow_phase() -> void:
-    if not harvest_phase:
+## Fecha a janela de semeadura do cultivo agora (fim da semeadura).
+func close_sowing(grid: PlantingGrid) -> void:
+    if grid.has_pending_crop():
+        _harvest_phase_by_grid[grid] = true
+
+func _on_sow_cell_planted(_cell_id: String, grid: PlantingGrid) -> void:
+    _last_sow_by_grid[grid] = Time.get_ticks_msec() / 1000.0
+
+## Uma planta saiu do broto: o cultivo começou a se desenvolver.
+func _on_crop_stage_changed(cell_id: String, stage: String) -> void:
+    if stage == CropPlant.STAGES[0]:
         return
-    for grid in get_all_grids():
-        if grid.has_pending_crop():
-            return
-    harvest_phase = false
-    for grid in get_all_grids():
-        grid.reopen_harvested()
+    var grid := get_grid_for_cell(cell_id)
+    if grid and grid.cells.has(cell_id) and grid.cells[cell_id]["state"] != "EMPTY":
+        _developed_by_grid[grid] = true
 
-func _on_sow_cell_state(_cell_id: String, state: String) -> void:
-    if state == PlantingGrid.STATE_HARVESTING:
-        harvest_phase = true
+## Pode semear em todos os cultivos (nenhum em fase de colheita)?
+func can_sow() -> bool:
+    for grid in get_all_grids():
+        if not can_sow_grid(grid):
+            return false
+    return true
+
+## Fecha o ciclo de colheita do cultivo quando nada plantado nele ficou por
+## colher: as covas colhidas reabrem e a semeadura volta.
+func _update_sow_phase(grid: PlantingGrid) -> void:
+    if not is_harvest_phase(grid) or grid.has_pending_crop():
+        return
+    _harvest_phase_by_grid[grid] = false
+    _developed_by_grid[grid] = false
+    grid.reopen_harvested()
+
+## SOW-CYCLE-003 (pedido do Celso, 25/11): "só quando o cultivo for totalmente
+## colhido o novo plantio é habilitado". A fase de colheita do cultivo começa
+## no primeiro pé MADURO (antes: só quando a colheita começava, então dava para
+## semear covas vazias no meio de pés maduros) e só termina com tudo colhido.
+func _on_sow_cell_state(_cell_id: String, state: String, grid: PlantingGrid) -> void:
+    if state == PlantingGrid.STATE_HARVESTING or state == PlantingGrid.STATE_RIPE:
+        _harvest_phase_by_grid[grid] = true
     elif state == PlantingGrid.STATE_HARVESTED:
-        call_deferred("_update_sow_phase")
+        call_deferred("_update_sow_phase", grid)
 
 ## Grade (tomate ou cultura extra) dona da cova `cell_id`.
 func get_grid_for_cell(cell_id: String) -> PlantingGrid:
@@ -1186,7 +1241,8 @@ func _build_helper() -> void:
     add_child(tomato_pile)
     tomato_pile.setup(get_extra_plot_rect(), harvest_inventory.units_per_crate)
     extra_planting_area.set_meta("role", "tomato_pile")
-    farm_helper = FARM_HELPER_SCRIPT.create() as FarmHelper
+    # HELPER-WORKER-001: a ajudante do canteiro de tomates é a trabalhadora rural 3D.
+    farm_helper = FARM_HELPER_SCRIPT.create(true) as FarmHelper
     add_child(farm_helper)
     farm_helper.setup(planting_grid, crops, tomato_pile, helper_hiring, self, harvest_inventory.units_per_crate)
     helper_pad = HELPER_PAD_SCRIPT.new() as HelperPad
@@ -1253,6 +1309,7 @@ func _spawn_crop(_landing: Vector3, cell_id: String) -> CropPlant:
     add_child(crop)
     crops[cell_id] = crop
     crop.ready_for_harvest.connect(_on_crop_ready)
+    crop.stage_changed.connect(_on_crop_stage_changed)
     crop.initialize(cell_id, cell["planted_at"])
     return crop
 

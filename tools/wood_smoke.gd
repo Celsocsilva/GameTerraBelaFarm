@@ -31,6 +31,7 @@ func _run() -> void:
     _test_seasons(grove)
     await _test_chop_cycle(world, grove)
     _test_one_product(world, grove)
+    _test_five_bundle_limit(world, grove)
     await _test_counter_and_sale(world)
     var trees := grove.get_tree_count()
     world.queue_free()
@@ -222,6 +223,40 @@ func _test_one_product(world: FarmWorld, grove: EucalyptusGrove) -> void:
     _check(reasons == [&"other_item"], "aviso de mochila ocupada: %s" % [reasons])
     _check(world.backpack.item_id == &"tomato", "mochila não voltou a mostrar tomates")
     inventory.set_amount(&"tomato", 0)
+    inventory.set_amount(WoodConfig.ITEM, wood)
+
+## WOOD-CARRY-001: no máximo 5 fardos (40 toras) por viagem; cheia, não corta;
+## depois de descarregar, volta a cortar.
+func _test_five_bundle_limit(world: FarmWorld, grove: EucalyptusGrove) -> void:
+    var inventory := world.harvest_inventory
+    var wood := inventory.get_amount(WoodConfig.ITEM)
+    _check(inventory.get_capacity(WoodConfig.ITEM) == 5 * WoodConfig.LOGS_PER_BUNDLE, "capacidade da madeira: %d" % inventory.get_capacity(WoodConfig.ITEM))
+    _check(inventory.get_max_crates(WoodConfig.ITEM) == 5 and inventory.get_max_crates(&"tomato") == 7, "fardos por viagem")
+    inventory.set_amount(WoodConfig.ITEM, 36)
+    var free_trees: Array = []
+    for t in grove.trees:
+        if (t as EucalyptusTree).state == EucalyptusTree.GROWN:
+            free_trees.append(t)
+    _walk_and_chop(world, grove, free_trees[0])
+    grove.finish_flights()
+    _check(inventory.get_amount(WoodConfig.ITEM) == 40 and inventory.is_full() and inventory.get_crate_count() == 5, "5 fardos cheios: %d toras" % inventory.get_amount(WoodConfig.ITEM))
+    if world.hud:
+        _check(world.hud.get_crate_text().contains("5/5"), "HUD de fardos: %s" % world.hud.get_crate_text())
+    var reasons := []
+    var on_block := func(reason: StringName) -> void: reasons.append(reason)
+    grove.process_farmer_position(Vector3(500.0, 0.0, 500.0), STEP)   # longe: rearma o aviso
+    grove.chop_blocked.connect(on_block)
+    var next: EucalyptusTree = free_trees[1]
+    var pos := next.global_position + Vector3(0.6, 0.0, 0.4)
+    grove.process_farmer_position(pos, STEP)
+    grove.process_farmer_position(pos, STEP)
+    _check(not grove.is_chopping() and next.state == EucalyptusTree.GROWN and reasons == [&"full"], "cortou com 5 fardos: %s" % [reasons])
+    grove.chop_blocked.disconnect(on_block)
+    grove.process_farmer_position(Vector3(500.0, 0.0, 500.0), STEP)
+    inventory.set_amount(WoodConfig.ITEM, 0)   # descarregou no balcão
+    _walk_and_chop(world, grove, next)
+    grove.finish_flights()
+    _check(inventory.get_amount(WoodConfig.ITEM) == WoodConfig.LOGS_PER_TREE, "não voltou a cortar depois de descarregar")
     inventory.set_amount(WoodConfig.ITEM, wood)
 
 func _test_counter_and_sale(world: FarmWorld) -> void:

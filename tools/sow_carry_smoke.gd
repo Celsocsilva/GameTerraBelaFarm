@@ -2,7 +2,7 @@ extends SceneTree
 ## SEED-003 + PUMPKIN-CARRY-001 + SOW-SPEED-001 (pedidos do Celso, 24/11).
 ## Uso: Godot --headless --path . -s tools/sow_carry_smoke.gd
 ## 1) Sementes menores e lançamento rasteiro, saindo da mão à frente do fazendeiro.
-## 2) No máximo 7 abóboras por transporte (e 7 imagens na mochila).
+## 2) No máximo 5 abóboras por transporte (e 5 imagens na mochila) — PUMPKIN-CARRY-002, 25/11 (era 7).
 ## 3) Mais devagar enquanto semeia sobre o canteiro.
 
 var _failures := 0
@@ -50,21 +50,21 @@ func _test_seed_throw() -> void:
 
 func _test_pumpkin_limit() -> void:
     var inventory := HarvestInventory.new()
-    _check(inventory.get_capacity(&"pumpkin") == 7, "abóbora: 7 por transporte")
+    _check(inventory.get_capacity(&"pumpkin") == 5, "abóbora: 5 por transporte")
     _check(inventory.get_capacity(&"tomato") == inventory.max_crates * inventory.units_per_crate, "tomate mantém a capacidade")
     var reservation := inventory.try_reserve(&"pumpkin", 20)
-    _check(reservation.amount == 7, "reserva de abóbora limitada a 7 (obtido %d)" % reservation.amount)
+    _check(reservation.amount == 5, "reserva de abóbora limitada a 5 (obtido %d)" % reservation.amount)
     inventory.commit(reservation)
-    _check(inventory.get_amount(&"pumpkin") == 7 and inventory.is_full(), "mochila cheia com 7 abóboras")
-    _check(inventory.try_reserve(&"pumpkin", 1).amount == 0, "nenhuma abóbora além de 7")
+    _check(inventory.get_amount(&"pumpkin") == 5 and inventory.is_full(), "mochila cheia com 5 abóboras")
+    _check(inventory.try_reserve(&"pumpkin", 1).amount == 0, "nenhuma abóbora além de 5")
     inventory.set_amount(&"pumpkin", 30)
-    _check(inventory.get_amount(&"pumpkin") == 7, "set_amount também respeita 7")
+    _check(inventory.get_amount(&"pumpkin") == 5, "set_amount também respeita 5")
     inventory.free()
 
 func _test_backpack(world: FarmWorld) -> void:
-    world.harvest_inventory.set_amount(&"pumpkin", 7)
+    world.harvest_inventory.set_amount(&"pumpkin", 5)
     await process_frame
-    _check(world.backpack.get_visible_crate_count() == 7, "7 abóboras visíveis na mochila (obtido %d)" % world.backpack.get_visible_crate_count())
+    _check(world.backpack.get_visible_crate_count() == 5, "5 abóboras visíveis na mochila (obtido %d)" % world.backpack.get_visible_crate_count())
     world.harvest_inventory.set_amount(&"pumpkin", 0)
     await process_frame
 

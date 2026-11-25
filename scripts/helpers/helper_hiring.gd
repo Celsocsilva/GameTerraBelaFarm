@@ -90,9 +90,28 @@ func deliver_material(inventory: HarvestInventory, max_units: int) -> int:
         return 0
     material_units += removed
     material_changed.emit(material_units, get_requirement_units())
-    # Dinheiro já completo (parado em preço - 1) + material agora completo:
-    # o último dinheiro sai no próximo passo da plataforma.
+    # Dinheiro já completo + material agora completo: a plataforma chama
+    # try_complete() e a graduação sai sem gastar mais nada.
     return removed
+
+## HIRE-FIX-002: o preço já foi pago por inteiro e o material completou ->
+## contrata/melhora agora. Retorna true se a graduação subiu.
+func try_complete() -> bool:
+    if is_max() or get_next_cost() <= 0 or paid < get_next_cost():
+        return false
+    if requires_material() and not has_initial_requirement():
+        return false
+    if not _consume_initial_requirement():
+        return false
+    paid = 0
+    grade += 1
+    paid_changed.emit(paid, get_next_cost())
+    grade_changed.emit(grade)
+    return true
+
+## Dinheiro completo, só falta o material.
+func is_waiting_material() -> bool:
+    return not is_max() and paid >= get_next_cost() and requires_material() and not has_initial_requirement()
 
 func _consume_initial_requirement() -> bool:
     if not requires_material():
@@ -139,25 +158,20 @@ func pay(wallet: Wallet, amount: int = 1) -> int:
         return 0
     var remaining := get_remaining_cost()
     var units := mini(mini(maxi(amount, 0), remaining), wallet.get_balance())
-    # Sem o material, a plataforma pode guardar no máximo 99/100 dinheiros.
-    # Assim a graduação nunca é liberada e o último dinheiro não é consumido.
-    if requires_material() and units >= remaining and not has_initial_requirement():
-        units = maxi(0, remaining - 1)
-        requirement_failed.emit(requirement_item, get_missing_requirement_crates())
+    # HIRE-FIX-002 (bug do Celso, 25/11): antes, sem o material, a plataforma
+    # parava em 99/100 e o último dinheiro só saía depois dos fardos. Se a
+    # carteira estivesse vazia nessa hora (ou o dinheiro fosse gasto em outra
+    # plataforma), a contratação ficava presa em "falta 1". Agora o preço soma
+    # até 100/100 e fica guardado; quando os fardos completam, contrata sozinho.
     if units <= 0 or not wallet.spend(units, &"helper"):
         return 0
     paid += units
+    paid_changed.emit(paid, get_next_cost())
     if paid >= get_next_cost():
-        if not _consume_initial_requirement():
-            paid = get_next_cost() - 1
-            paid_changed.emit(paid, get_next_cost())
-            return units
-        paid = 0
-        grade += 1
-        paid_changed.emit(paid, get_next_cost())
-        grade_changed.emit(grade)
-    else:
-        paid_changed.emit(paid, get_next_cost())
+        if requires_material() and not has_initial_requirement():
+            requirement_failed.emit(requirement_item, get_missing_requirement_crates())
+        else:
+            try_complete()
     return units
 
 ## Restauração de save / testes.
@@ -173,7 +187,7 @@ func to_dict() -> Dictionary:
 
 func from_dict(data: Dictionary) -> void:
     set_grade(int(data.get("grade", 0)))
-    paid = clampi(int(data.get("paid", 0)), 0, maxi(get_next_cost() - 1, 0))
+    paid = clampi(int(data.get("paid", 0)), 0, maxi(get_next_cost(), 0))
     paid_changed.emit(paid, get_next_cost())
     material_units = clampi(int(data.get("material_units", 0)), 0, get_requirement_units())
     material_changed.emit(material_units, get_requirement_units())

@@ -17,7 +17,13 @@ const DEFAULT_ITEM := &"tomato"
 ## PUMPKIN-CARRY-001 (pedido do Celso): limite por transporte de alguns
 ## produtos, em unidades (abóbora: no máximo 7 por viagem). Os demais usam
 ## max_crates * units_per_crate.
-const ITEM_MAX_UNITS := {&"pumpkin": 7}
+## WOOD-CARRY-001 (pedido do Celso, 25/11): madeira no máximo 5 fardos por viagem
+## (5 x WoodConfig.LOGS_PER_BUNDLE = 40 toras = 10 eucaliptos). Cheia, o corte para
+## até descarregar no balcão.
+const WOOD_MAX_BUNDLES := 5
+## PUMPKIN-CARRY-002 (pedido do Celso, 25/11): abóbora no máximo 5 por viagem (era 7).
+const PUMPKIN_MAX_UNITS := 5
+const ITEM_MAX_UNITS := {&"pumpkin": PUMPKIN_MAX_UNITS, &"wood": 40}
 ## Unidades por "caixa" desenhada na mochila: cada abóbora aparece sozinha.
 const ITEM_UNITS_PER_CRATE := {&"pumpkin": 1}
 
@@ -46,6 +52,10 @@ class Reservation:
 func get_capacity(item_id: StringName = &"") -> int:
     var item := item_id if item_id != &"" else get_current_item()
     return int(ITEM_MAX_UNITS.get(item, max_crates * units_per_crate))
+
+## Caixas/fardos que cabem numa viagem de `item_id` (tomate 7, madeira 5, abóbora 7).
+func get_max_crates(item_id: StringName = &"") -> int:
+    return mini(max_crates, int(ceil(float(get_capacity(item_id)) / float(get_units_per_crate(item_id)))))
 
 ## Unidades por caixa desenhada de `item_id` (abóbora = 1 por imagem).
 func get_units_per_crate(item_id: StringName = &"") -> int:

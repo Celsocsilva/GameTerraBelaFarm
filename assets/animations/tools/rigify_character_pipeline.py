@@ -242,6 +242,10 @@ def skin(mesh, rig, cfg):
     _sel([mesh], mesh)
     bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
     bpy.ops.object.vertex_group_smooth(group_select_mode='ALL', factor=0.5, repeat=2)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    if cfg.get("head_rigid"):
+        rep["head_rigid_verts"] = _head_rigid(mesh, cfg["head_rigid"])
+    bpy.ops.object.mode_set(mode='WEIGHT_PAINT')
     bpy.ops.object.vertex_group_clean(group_select_mode='ALL', limit=0.01)
     bpy.ops.object.vertex_group_limit_total(group_select_mode='ALL', limit=4)
     bpy.ops.object.vertex_group_normalize_all(group_select_mode='ALL', lock_active=False)
@@ -250,6 +254,34 @@ def skin(mesh, rig, cfg):
     rep["groups"] = [g.name for g in mesh.vertex_groups]
     log("skin", rep)
     return rep
+
+
+def _head_rigid(mesh, hr):
+    """Chapéu/cabelo presos 100% na cabeça (o bone heat espalha a aba do chapéu pelos ombros/braços).
+    head_rigid: {"z0", "z1"}: transição suave de z0 a z1 (acima de z1 = só cabeça);
+    opcional "brim_z", "brim_r": também prende vértices acima de brim_z e a mais de brim_r do eixo
+    vertical (aba do chapéu que desce nas costas/laterais)."""
+    def smooth(e0, e1, x):
+        t = min(max((x - e0) / (e1 - e0), 0.0), 1.0)
+        return t * t * (3 - 2 * t)
+    head = mesh.vertex_groups.get("DEF-spine.005")
+    names = {g.index: g.name for g in mesh.vertex_groups}
+    n = 0
+    for v in mesh.data.vertices:
+        c = v.co
+        w = smooth(hr["z0"], hr["z1"], c.z)
+        if "brim_z" in hr and c.z > hr["brim_z"] and math.hypot(c.x, c.y) > hr["brim_r"]:
+            w = max(w, smooth(hr["brim_r"], hr["brim_r"] + 0.03, math.hypot(c.x, c.y)))
+        if w <= 0:
+            continue
+        n += 1
+        old = {g.group: g.weight for g in v.groups}
+        hw = old.get(head.index, 0.0)
+        for gi, gw in old.items():
+            if gi != head.index:
+                mesh.vertex_groups[names[gi]].add([v.index], gw * (1 - w), 'REPLACE')
+        head.add([v.index], hw * (1 - w) + w, 'REPLACE')
+    return n
 
 
 # ---------------------------------------------------------------------------
@@ -366,10 +398,26 @@ def retarget(src, acts, rig, game, cfg):
     errs = {}
     errs_bone = {}
 
+    # arms_from_rest: personagem em T-pose -> o braço de repouso é alinhado à direção do osso na pose
+    # de repouso da UAL (rotação mínima) e a animação é aplicada a partir dali. Sem isso o braço fica
+    # em T-pose no Idle (o modo padrão copia o Idle f0 como se fosse a pose de repouso do personagem).
+    align = {}
+    if cfg.get("arms_from_rest"):
+        for n in ARM_BONES:
+            un = UAL_NAME.get(n, n)
+            dg_ = (rest_g[n].to_3x3() @ Vector((0, 1, 0))).normalized()
+            du_ = (rest_u[un].to_3x3() @ Vector((0, 1, 0))).normalized()
+            align[n] = dg_.rotation_difference(du_).to_matrix()
+    # pose_override parte da pose neutra (Idle f0) já alinhada, como no personagem em A-pose
+    _ALIGN.clear()
+    _ALIGN.update({n: ref[UAL_NAME.get(n, n)] @ rest_u[UAL_NAME.get(n, n)].to_3x3().inverted() @ m for n, m in align.items()})
+
     def desired(n, eu):
         un = UAL_NAME.get(n, n)
         pu = src.matrix_world @ eu.pose.bones[un].matrix
-        if n in ARM_BONES:  # braços: relativo à pose neutra (Idle f0) -> encaixa A-pose x T-pose
+        if n in align:
+            R = pu.to_3x3() @ rest_u[un].to_3x3().inverted() @ align[n] @ rest_g[n].to_3x3()
+        elif n in ARM_BONES:  # braços: relativo à pose neutra (Idle f0) -> encaixa A-pose x T-pose
             R = pu.to_3x3() @ ref[un].inverted() @ rest_g[n].to_3x3()
         else:
             R = pu.to_3x3() @ rest_u[un].to_3x3().inverted() @ rest_g[n].to_3x3()
@@ -454,6 +502,9 @@ _DEF_OF = {v: k for k, v in DEF_TO_STD.items()}
 def _def_of(n): return "ORG-" + _DEF_OF[n][4:]     # osso que o esqueleto de jogo copia
 
 
+_ALIGN = {}   # alinhamento de repouso dos braços (arms_from_rest), preenchido em retarget()
+
+
 def _override(anim, n, R, rest_g, want):
     """Sobrepõe a rotação de ossos (ex.: braços segurando caixa) -- definido no config.
     pose_override: {osso: [rx, ry, rz]} graus, eixos do mundo na pose de repouso, aplicados sobre o rest
@@ -468,7 +519,7 @@ def _override(anim, n, R, rest_g, want):
     Rw = Matrix.Rotation(math.radians(e[2]), 3, 'Z') @ Matrix.Rotation(math.radians(e[1]), 3, 'Y') @ Matrix.Rotation(math.radians(e[0]), 3, 'X')
     chest = want.get("spine_03")
     D = (chest[0] @ rest_g["spine_03"].to_3x3().inverted()) if chest else Matrix.Identity(3)
-    return D @ Rw @ rest_g[n].to_3x3()
+    return D @ Rw @ _ALIGN.get(n, Matrix.Identity(3)) @ rest_g[n].to_3x3()
 
 
 def bake_game(rig, game, rig_actions):
@@ -503,7 +554,7 @@ def bake_game(rig, game, rig_actions):
     return game_actions
 
 
-def export_glb(game, mesh, path):
+def export_glb(game, mesh, path, image_format='AUTO'):
     # durante a exportação o esqueleto de jogo não pode depender do Rigify
     mutes = []
     for pb in game.pose.bones:
@@ -516,7 +567,7 @@ def export_glb(game, mesh, path):
         export_yup=True, export_skins=True, export_def_bones=False, export_animations=True,
         export_animation_mode='NLA_TRACKS', export_force_sampling=True, export_optimize_animation_size=True,
         export_normals=True, export_tangents=False, export_texcoords=True, export_materials='EXPORT',
-        export_image_format='AUTO', export_cameras=False, export_lights=False, export_all_influences=False,
+        export_image_format=image_format, export_jpeg_quality=92, export_cameras=False, export_lights=False, export_all_influences=False,
         export_reset_pose_bones=True)
     for c, e in mutes: c.enabled = e
 
@@ -555,7 +606,7 @@ def run(cfg, stage="all"):
     bpy.data.objects.remove(src, do_unlink=True)
     report["animations"] = {k: round(v, 2) for k, v in retarget.errors.items()}
     glb = os.path.join(out_dir, f"{name.lower()}.glb")
-    export_glb(game, mesh, glb)
+    export_glb(game, mesh, glb, cfg.get("image_format", "AUTO"))
     report["glb"] = glb
     bpy.ops.wm.save_as_mainfile(filepath=blend, compress=True)
     report["blend"] = blend

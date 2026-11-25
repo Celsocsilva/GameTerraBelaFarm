@@ -13,12 +13,51 @@ func _check(ok: bool, message: String) -> void:
         _failures += 1
         push_error("PUMPKIN_SMOKE_FAIL: " + message)
 
+## PUMPKIN-STACK-001 + PUMPKIN-CARRY-002 (25/11): 5 abóboras por viagem; no
+## balcão elas ficam empilhadas uma a uma, com a mesma altura máxima e o mesmo
+## contador "xN" da pilha de caixas de tomate.
+func _test_counter_stack() -> void:
+    var inv := world.harvest_inventory
+    var counter := world.sales_counter
+    var stack := counter.get_extra_stack(&"pumpkin")
+    _check(stack != null, "balcão sem pilha de abóbora")
+    if stack == null:
+        return
+    for item in [&"tomato", &"corn", &"wood", &"milk", &"pumpkin"]:
+        inv.set_amount(item, 0)
+    _check(inv.get_capacity(&"pumpkin") == 5, "abóbora: 5 por viagem (%d)" % inv.get_capacity(&"pumpkin"))
+    inv.set_amount(&"pumpkin", 9)
+    _check(inv.get_amount(&"pumpkin") == 5, "mochila limita a 5 abóboras")
+    var deposited := counter.deposit_from(inv, null)
+    stack.finish_jumps()
+    _check(deposited == 5 and stack.get_stored_total() == 5, "balcão recebeu 5 abóboras: %d" % deposited)
+    _check(stack.get_crate_count() == 5, "cada abóbora é uma peça da pilha: %d" % stack.get_crate_count())
+    _check(stack.get_visual_max() == SalesCounter.MAX_VISUAL_CRATES, "mesma altura da pilha de tomate")
+    _check(stack.get_visible_crate_count() == SalesCounter.MAX_VISUAL_CRATES, "abóboras empilhadas visíveis: %d" % stack.get_visible_crate_count())
+    # Contador idêntico ao das caixas de tomate com o mesmo número de peças.
+    counter.set_stored_total(5 * counter.units_per_crate)
+    counter.finish_jumps()
+    await process_frame
+    _check(stack.get_count_text() == "x5" and counter.get_count_text() == stack.get_count_text(), "contador da abóbora '%s' x tomate '%s'" % [stack.get_count_text(), counter.get_count_text()])
+    var a := stack.get_count_label()
+    var b := counter.get_count_label()
+    _check(a.font_size == b.font_size and a.pixel_size == b.pixel_size and a.modulate == b.modulate and a.outline_modulate == b.outline_modulate, "estilo do contador igual ao do tomate")
+    # Segunda viagem: soma na pilha (x10).
+    inv.set_amount(&"pumpkin", 5)
+    counter.deposit_from(inv, null)
+    stack.finish_jumps()
+    _check(stack.get_count_text() == "x10", "segunda viagem soma: %s" % stack.get_count_text())
+    counter.set_stored_total(0)
+    counter.set_item_total(&"pumpkin", 0)
+    print("PUMPKIN_COUNTER_STACK_OK visible=%d label=x10" % stack.get_visible_crate_count())
+
 func _run() -> void:
     _test_assets()
     await _load_world()
     _test_map_and_layout()
     await _test_stages_and_harvest()
     await _load_world()
+    await _test_counter_stack()
     _test_helper_requirement_and_cycle()
     if world:
         world.queue_free()

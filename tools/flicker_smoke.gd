@@ -67,7 +67,7 @@ func _test_backpack_depth(world: FarmWorld) -> void:
             world.farmer.rotation.y = angle
             backpack._orient_crates()
             min_gap = minf(min_gap, _min_depth_gap(backpack, toward))
-        _check(backpack.get_visible_crate_count() == backpack.max_crates, "%s: 7 caixas visíveis" % item)
+        _check(backpack.get_visible_crate_count() == inv.get_max_crates(item), "%s: %d caixas visíveis (máx. da viagem %d)" % [item, backpack.get_visible_crate_count(), inv.get_max_crates(item)])
         # Cada caixa >= 3 cm mais perto da câmera que a anterior, em qualquer
         # giro do fazendeiro: nada de duas artes no mesmo plano (listras).
         _check(min_gap >= 0.03, "%s: caixas no mesmo plano (menor distância %.4f m)" % [item, min_gap])

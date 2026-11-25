@@ -234,7 +234,7 @@ func _on_inventory_changed(_item: StringName, _amount: int) -> void:
 func _update_inventory(animate: bool) -> void:
     # FV-WOOD-001: o contador de tomates conta só tomates (toras não entram).
     tomato_counter.set_ratio(inventory.get_amount(HarvestInventory.DEFAULT_ITEM), inventory.get_capacity(), animate)
-    crate_counter.set_ratio(inventory.get_crate_count(), inventory.max_crates, animate)
+    crate_counter.set_ratio(inventory.get_crate_count(), inventory.get_max_crates(), animate)
     if inventory.is_full():
         _show_banner_key(FULL_BACKPACK_MESSAGE, [])
     elif _banner_key == FULL_BACKPACK_MESSAGE:

@@ -1,9 +1,9 @@
 extends SceneTree
 ## FARMER-RIG-001 — capturas do fazendeiro rigado renderizado pelo Godot (Forward+/Mobile do projeto).
 ## Rodar SEM --headless:
-##   godot --path . --resolution 1280x720 -s tools/farmer_rig_capture.gd -- <pasta absoluta>
+##   godot --path . --resolution 1280x720 -s tools/farmer_rig_capture.gd -- <pasta absoluta> [--scene=res://.../x_character.tscn]
 
-const SCENE := "res://assets/animations/Farmer/farmer_character.tscn"
+var SCENE := "res://assets/animations/Farmer/farmer_character.tscn"
 const SHOTS := [
     ["01-basicas", [["Idle_Loop", 0.4], ["Walk_Loop", 0.35], ["Jog_Fwd_Loop", 0.25], ["Sprint_Loop", 0.2], ["Carry_Walk_Loop", 0.35]]],
     ["02-fazenda", [["Carry_Idle_Loop", 0.5], ["Fixing_Kneeling", 2.2], ["PickUp_Table", 0.45], ["Interact", 0.9], ["Crouch_Fwd_Loop", 0.5]]],
@@ -18,6 +18,10 @@ func _initialize() -> void:
 
 func _run() -> void:
     var args := OS.get_cmdline_user_args()
+    for a in args.duplicate():
+        if a.begins_with("--scene="):
+            SCENE = a.substr(8)
+            args.erase(a)
     out_dir = args[0] if args.size() > 0 else ProjectSettings.globalize_path("res://docs/evidence/farmer-rig-001")
     DirAccess.make_dir_recursive_absolute(out_dir)
     var stage := Node3D.new()

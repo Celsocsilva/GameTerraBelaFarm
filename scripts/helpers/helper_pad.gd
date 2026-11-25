@@ -263,17 +263,28 @@ func process_farmer_position(world_pos: Vector3, delta: float, inventory: Harves
     if _on_pad_time < START_DELAY:
         return 0
     _unload_material(world_pos, delta, inventory)
-    if wallet.get_balance() <= 0:
-        if not _warned_no_money:
+    # HIRE-FIX-002: dinheiro já completo; contrata assim que o material completa.
+    if hiring.is_waiting_material() or (hiring.get_remaining_cost() <= 0 and hiring.get_next_cost() > 0):
+        var grade_before := hiring.grade
+        if hiring.try_complete():
+            if hiring.grade > grade_before:
+                _play_pulse()
+                purchased.emit(hiring.grade)
+            # Não cobre o aviso de contratação com "faltam N" da próxima graduação.
             _warned_no_money = true
-            out_of_money.emit(hiring.get_remaining_cost())
-        return 0
-    if hiring.requires_material() and hiring.get_remaining_cost() <= 1 and not hiring.has_initial_requirement():
+            _on_pad_time = 0.0
+            _pay_accumulator = 0.0
+            return 0
         if _material_in_flight > 0 or (inventory != null and inventory.get_amount(hiring.requirement_item) > 0):
             return 0
         if not _warned_no_material:
             _warned_no_material = true
             out_of_material.emit(hiring.requirement_item, hiring.get_missing_requirement_crates())
+        return 0
+    if wallet.get_balance() <= 0:
+        if not _warned_no_money:
+            _warned_no_money = true
+            out_of_money.emit(hiring.get_remaining_cost())
         return 0
     _pay_accumulator += delta
     var paid_now := 0
@@ -289,6 +300,7 @@ func process_farmer_position(world_pos: Vector3, delta: float, inventory: Harves
         if hiring.grade > grade_before:
             _play_pulse()
             purchased.emit(hiring.grade)
+            _warned_no_money = true
             # A próxima graduação recomeça depois de uma nova pausa curta.
             _on_pad_time = 0.0
             _pay_accumulator = 0.0

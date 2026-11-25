@@ -78,9 +78,15 @@ func setup(plot_rect: Rect2, crate_units: int) -> void:
     if _count_label:
         _count_label.position = _count_label_local()
 
+## PUMPKIN-STACK-001: > 0 troca o limite visual da coluna (o balcão usa o mesmo
+## das caixas de tomate, SalesCounter.MAX_VISUAL_CRATES). Definir antes do _ready.
+var visual_max_override := 0
+
 ## Caixas desenhadas: na grade todas (até max_crates); na coluna, VISUAL_MAX.
 func get_visual_max() -> int:
-    return max_crates if grid_layout else VISUAL_MAX
+    if grid_layout:
+        return max_crates
+    return visual_max_override if visual_max_override > 0 else VISUAL_MAX
 
 func _ready() -> void:
     if grid_layout:
@@ -220,7 +226,7 @@ func _refresh() -> void:
 func _slot_local(index: int) -> Vector3:
     if grid_layout:
         return _grid_slot_local(index)
-    var layer := CrateStack.visual_index(index, VISUAL_MAX)
+    var layer := CrateStack.visual_index(index, get_visual_max())
     var spacing := STACK_SPACING
     if rect.size.x > 0.0:
         spacing = minf(spacing, (rect.size.x - crate_width) * 0.5)

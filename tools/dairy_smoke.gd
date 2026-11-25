@@ -242,11 +242,11 @@ func _test_cow_purchase() -> void:
     var pad := world.cow_shop_pad
     var inv := world.harvest_inventory
     var wallet := world.wallet
-    # Só dinheiro, sem milho: guarda no máximo 199 e não compra.
+    # Só dinheiro, sem milho: soma o preço inteiro (200/200, HIRE-FIX-002) e não compra até o milho.
     wallet.set_balance(500)
     _stand_on_pad(12.0)
     _check(world.cow_pen.get_cow_count() == 1, "comprou vaca sem milho")
-    _check(shop.paid == DairyConfig.COW_PRICE - 1 and wallet.get_balance() == 500 - (DairyConfig.COW_PRICE - 1), "sem milho deveria pagar 199: paid=%d saldo=%d" % [shop.paid, wallet.get_balance()])
+    _check(shop.paid == DairyConfig.COW_PRICE and wallet.get_balance() == 500 - DairyConfig.COW_PRICE and shop.is_waiting_material(), "sem milho deveria guardar 200/200: paid=%d saldo=%d" % [shop.paid, wallet.get_balance()])
     # Milho em 3 viagens (mochila: 7 caixas por vez).
     var trips := 0
     while world.cow_pen.get_cow_count() < 2 and trips < 5:

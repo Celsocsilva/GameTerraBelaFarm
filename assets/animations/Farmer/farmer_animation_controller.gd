@@ -49,6 +49,9 @@ const UPPER_BONES := [
     "clavicle_r", "upperarm_r", "lowerarm_r", "hand_r",
 ]
 const SKELETON_PATH := "Farmer_Armature/Skeleton3D"
+## Caminho do Skeleton3D a partir da raiz do modelo. Descoberto no _ready (FarmWorker_Armature/... na
+## trabalhadora); SKELETON_PATH é só o padrão do fazendeiro.
+var skeleton_path := SKELETON_PATH
 
 @export var animation_player: AnimationPlayer
 @export var blend_time := 0.18
@@ -91,6 +94,11 @@ func _ready() -> void:
     for anim_name in animation_player.get_animation_list():
         if String(anim_name).ends_with("_Loop"):
             animation_player.get_animation(anim_name).loop_mode = Animation.LOOP_LINEAR
+    var model_root := animation_player.get_parent()
+    if model_root.get_node_or_null(skeleton_path) == null:
+        var found := model_root.find_children("*", "Skeleton3D", true, false)
+        if not found.is_empty():
+            skeleton_path = String(model_root.get_path_to(found[0]))
     _build_tree()
 
 
@@ -119,7 +127,7 @@ func _build_tree() -> void:
     upper.fadeout_time = 0.2
     upper.filter_enabled = true
     for bone in UPPER_BONES:
-        upper.set_filter_path(NodePath("%s:%s" % [SKELETON_PATH, bone]), true)
+        upper.set_filter_path(NodePath("%s:%s" % [skeleton_path, bone]), true)
     _upper_anim = AnimationNodeAnimation.new()
     _upper_anim.animation = ANIM_SOW
     bt.add_node("upper_anim", _upper_anim)
@@ -146,7 +154,7 @@ func _build_tree() -> void:
     var chop_blend := AnimationNodeBlend2.new()
     chop_blend.filter_enabled = true
     for bone in CHOP_BONES:
-        chop_blend.set_filter_path(NodePath("%s:%s" % [SKELETON_PATH, bone]), true)
+        chop_blend.set_filter_path(NodePath("%s:%s" % [skeleton_path, bone]), true)
     var chop_anim := AnimationNodeAnimation.new()
     chop_anim.animation = ANIM_CHOP
     bt.add_node("chop_anim", chop_anim)
@@ -287,14 +295,14 @@ func _get_skeleton() -> Skeleton3D:
     if _skeleton == null and animation_player:
         var anim_root := animation_player.get_node_or_null(animation_player.root_node)
         if anim_root:
-            _skeleton = anim_root.get_node_or_null(SKELETON_PATH) as Skeleton3D
+            _skeleton = anim_root.get_node_or_null(skeleton_path) as Skeleton3D
     return _skeleton
 
 
 ## Pose-base de cada osso: o primeiro quadro do Idle (ou o rest), em rotação local.
 func _base_local_rotation(skeleton: Skeleton3D, idle: Animation, bone: int) -> Quaternion:
     if idle:
-        var track := idle.find_track(NodePath("%s:%s" % [SKELETON_PATH, skeleton.get_bone_name(bone)]), Animation.TYPE_ROTATION_3D)
+        var track := idle.find_track(NodePath("%s:%s" % [skeleton_path, skeleton.get_bone_name(bone)]), Animation.TYPE_ROTATION_3D)
         if track >= 0:
             return idle.rotation_track_interpolate(track, 0.0)
     return skeleton.get_bone_rest(bone).basis.get_rotation_quaternion()
@@ -340,7 +348,7 @@ func _build_chop_animation() -> void:
         if bone < 0:
             continue
         var track := anim.add_track(Animation.TYPE_ROTATION_3D)
-        anim.track_set_path(track, NodePath("%s:%s" % [SKELETON_PATH, bone_name]))
+        anim.track_set_path(track, NodePath("%s:%s" % [skeleton_path, bone_name]))
         anim.track_set_interpolation_type(track, Animation.INTERPOLATION_CUBIC)
         var parent := skeleton.get_bone_parent(bone)
         var parent_global: Quaternion = base_global[parent] if parent >= 0 else Quaternion.IDENTITY
