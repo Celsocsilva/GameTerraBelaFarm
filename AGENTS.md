@@ -20,3 +20,7 @@ Demanda -> Refinamento -> Arquitetura -> Implementação -> QA -> Review -> PR -
 ## Definição de pronto
 
 Código/documentação implementados, validação aplicável executada, sem segredos ou temporários versionados e handoff com limitações.
+
+## MVP comercial e LiveOps — contratos v2.0.0
+
+Consultar [especificação MVP](docs/architecture/MVP_LIVEOPS.md), [matriz](docs/orchestration/agent-matrix.md) e [registry](orchestration/config/agents.yaml). 12 especialistas + AGENT-00 coordenador. Novos domínios backend (09), database (10), liveops (11), security (12). DDL exige revisão DBA, COMMENT em todos os objetos/campos suportados, dicionário complementar e performance medida. Segurança revisa login, tokens, dados e IAP. Ações produtivas, benefícios/campanhas reais, alterações econômicas e merge exigem aprovação humana. Usar arquivos canônicos do registry.

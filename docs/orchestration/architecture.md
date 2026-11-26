@@ -5,3 +5,7 @@ Product Owner/Human Supervisor -> Governance -> Orchestrator -> Specialized Agen
 Governance is policy and approval. Agents are contracts and scopes. Runtime persists tasks, state, handoffs and evidence. GitHub remains the versioned source of truth.
 
 The first mode is assisted: CLI creates a package, a human forwards it to ChatGPT/Claude, and the response is recorded. LLM calls are interfaces only and disabled by default.
+
+## v2.0.0
+
+AGENT-00 plus 12 specialists. Dispatcher resolves domains from the constrained inline registry; existing domains and handoff schema v1 remain compatible. Workflows, specialist reviews and quality-gate declarations guide assisted execution; they are not yet automatically enforced by the state machine. No LLM adapter is enabled. See [matrix](agent-matrix.md) and [MVP](../architecture/MVP_LIVEOPS.md).

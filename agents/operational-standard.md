@@ -28,3 +28,7 @@ Quando aplicável, usar REVIEW REPORT com Issue, PR, commit, escopo, documentos,
 ## Evidência
 
 Registrar comando, ambiente, versão Godot/SDK, dispositivo ou runner, resultado, log/artefato, critérios cobertos e risco residual em docs/evidence.
+
+## Versão 2.0.0 — MVP comercial e LiveOps
+
+AGENT-00 coordena 12 especialistas. Registry e contratos canônicos são a fonte de verdade; aliases antigos encaminham. Consultar docs/architecture/MVP_LIVEOPS.md. Stack Godot/PHP/MySQL/FCM, Bootstrap e Chart.js. Níveis da approval-policy prevalecem. QA e Reviewer independentes; DBA revisa DDL e Security revisa identidade, IAP e dados. Não declarar gates automatizados quando somente critérios manuais. Registrar evidência e status de gates aplicáveis, incluindo justificativa de não aplicabilidade. Severidade de defeitos distinta de prioridade de backlog.

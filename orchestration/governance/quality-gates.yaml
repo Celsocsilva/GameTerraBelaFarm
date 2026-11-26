@@ -1,4 +1,4 @@
-version: 1
+version: 2
 gates:
   - id: GOV-001
     name: governance
@@ -25,3 +25,23 @@ gates:
     condition: required_approval_recorded
     evidence: approval_record
     on_failure: await_approval
+  - id: DB-001
+    name: mysql-schema-documentation
+    condition: applicable_mysql_objects_documented_100_percent_and_migrations_valid
+    evidence: schema_coverage_and_migration_report
+    on_failure: block
+  - id: DB-002
+    name: mysql-integrity-performance
+    condition: applicable_concurrency_and_critical_query_benchmarks_pass
+    evidence: mysql_integrity_and_benchmark_report
+    on_failure: block
+  - id: SEC-001
+    name: security-and-iap
+    condition: applicable_auth_privacy_and_iap_controls_verified
+    evidence: security_and_billing_test_report
+    on_failure: block
+  - id: LIVEOPS-001
+    name: campaign-and-reward-integrity
+    condition: applicable_consent_route_queue_and_reward_idempotency_verified
+    evidence: liveops_test_report
+    on_failure: block

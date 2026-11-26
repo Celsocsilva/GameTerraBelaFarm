@@ -1,0 +1,10 @@
+name: liveops
+states: [BACKLOG, REFINEMENT, READY, IN_PROGRESS, CODE_REVIEW, TESTING, AWAITING_APPROVAL, MERGE_READY, DONE]
+required_agents: [AGENT-01, AGENT-02, AGENT-06, AGENT-08]
+specialists_by_domain:
+  backend: [AGENT-09, AGENT-10, AGENT-12]
+  database: [AGENT-10, AGENT-09, AGENT-07]
+  liveops: [AGENT-11, AGENT-09, AGENT-05, AGENT-10, AGENT-12]
+  security: [AGENT-12, AGENT-09, AGENT-10]
+human_approval: required
+# Assisted workflow: select applicable specialists and record gate evidence.

@@ -1,4 +1,4 @@
-version: 1
+version: 2
 states: [BACKLOG, REFINEMENT, READY, IN_PROGRESS, CODE_REVIEW, TESTING, AWAITING_APPROVAL, MERGE_READY, DONE, BLOCKED, FAILED, CANCELLED]
 terminal: [DONE, CANCELLED]
 transitions:
@@ -12,3 +12,9 @@ transitions:
   MERGE_READY: [DONE, IN_PROGRESS, BLOCKED]
   BLOCKED: [REFINEMENT, READY, CANCELLED]
   FAILED: [REFINEMENT, CANCELLED]
+# Assisted guidance; transitions remain unchanged.
+domain_workflows:
+  backend: liveops
+  database: liveops
+  liveops: liveops
+  security: liveops
