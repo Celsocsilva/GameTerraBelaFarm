@@ -134,6 +134,64 @@ Exemplos para validação econômica: boas-vindas, retorno após 3 dias, sete di
 
 Usar migrations reversíveis quando possível, índices para player_id/last_seen_at, status/scheduled_at, event_name/occurred_at e campaign_id; paginação e agregados, retenção e anonimização conforme finalidade. Definir política de exclusão inclusive em backups; dados de auditoria/compra mantidos somente quando justificados. Backup automático criptografado e teste de restauração em staging; propor RPO/RTO e validar com responsável.
 
+### 9.1. Padrão obrigatório de engenharia MySQL e dicionário de dados
+
+**Requisito do Product Owner (25/11/2026):** todos os objetos e campos devem ter descrição documental. O próprio banco deve ser autodescritivo, com uso do recurso nativo COMMENT sempre que suportado. O requisito vale para migrations iniciais e evolutivas, incluindo objetos técnicos, tabelas de junção e tabelas de controle de migrations sob nosso domínio. Não utilizar comentários genéricos, vazios ou mera repetição do nome.
+
+- Tabelas: COMMENT com finalidade, domínio e responsabilidade. Colunas (inclusive PK, FK, timestamps, flags, colunas geradas e técnicas): COMMENT com significado, unidade/moeda, semântica de NULL, estados e origem quando pertinentes. Preservar comentários ao alterar colunas.
+- Índices: COMMENT onde suportado, descrevendo consulta/invariante atendida; documentar índices implícitos e chaves quando não houver suporte nativo. FKs, UNIQUE e CHECK com nomes estáveis e descrição da relação, cardinalidade, regra e efeitos de exclusão/atualização.
+- Procedures, functions e events: COMMENT nativo, assinatura/parâmetros, propósito, transações, periodicidade quando aplicável e efeitos colaterais documentados. Partições: COMMENT onde suportado, estratégia, critério e retenção. Views, colunas derivadas de views, triggers, schemas, constraints e demais objetos sem cláusula COMMENT própria: descrição no DDL versionado e catálogo complementar por nome qualificado. Não inventar sintaxe incompatível com MySQL.
+- Dicionário de dados gerado automaticamente a partir de INFORMATION_SCHEMA (TABLES, COLUMNS, STATISTICS, ROUTINES, EVENTS, VIEWS, TRIGGERS, KEY_COLUMN_USAGE, REFERENTIAL_CONSTRAINTS, CHECK_CONSTRAINTS, PARTITIONS, conforme aplicável) e catálogo versionado complementar. Publicar em docs/database/ como artefato de CI; não incluir dados de jogadores, credenciais, tokens ou conteúdo real. Cobertura documental esperada: 100% dos objetos próprios; exceções técnicas de terceiros documentadas e aprovadas.
+
+### 9.2. Identificadores e objetos de otimização
+
+MySQL 8.x não possui CREATE SEQUENCE nativo. Adotar BIGINT UNSIGNED AUTO_INCREMENT para identificadores internos de entidades de alto volume quando apropriado, com PK compacta; lacunas são normais. Identificadores públicos opacos (UUID binário ou equivalente) e chaves de idempotência independentes quando exigidos pelos contratos. Não usar MAX(id)+1 nem assumir ordem de commit a partir do ID. Se uma numeração de negócio independente for necessária, criar tabela de sequências por escopo e alocação atômica em transação curta, com locking e teste de concorrência; evitar contador global como gargalo. Não criar sequência customizada sem necessidade de negócio. Não prometer numeração sem lacunas sem requisito e desenho específicos.
+
+Utilizar InnoDB, utf8mb4, tipos mínimos adequados, valores monetários em inteiros de menor unidade ou DECIMAL conforme contrato, UTC e integridade referencial. Definir PK, FK, UNIQUE, CHECK e índices compostos com base nos padrões de consulta e cardinalidade. Exemplos candidatos: notification_outbox(status, scheduled_at, id), players(last_seen_at, id), game_events(player_id, occurred_at, id), economy_ledger(player_id, id), chaves únicas de purchase token, operation_id e reward occurrence. A ordem exata deve ser confirmada pelo plano de execução. Evitar índices redundantes ou excessivos; revisar índices de FK e custo de escrita.
+
+Views para consultas reutilizáveis e acesso restrito; views comuns do MySQL não são materializadas. Para dashboard Chart.js, usar tabelas de agregados por dia/coorte/campanha, com atualização incremental e reconciliação. Stored procedures/functions para operações em que atomicidade, menor round-trip ou reutilização justifiquem; triggers apenas para invariantes/auditoria simples quando necessário, evitando lógica comercial oculta e efeitos em cascata. Events do MySQL apenas com justificativa operacional, observabilidade e sem duplicar o cron/worker PHP já definido. Particionar tabelas volumosas por retenção temporal apenas após benchmark, avaliando restrições MySQL de chaves únicas e FKs em tabelas InnoDB particionadas. Não criar objetos somente para preencher uma lista: cada objeto deve ter finalidade, teste e evidência.
+
+Performance: paginação por cursor para histórico volumoso, batches limitados, evitar SELECT * e N+1, transações curtas, retry de deadlock com idempotência e índice para seleção de fila. Monitorar slow query log, Performance Schema/sys, latência p95/p99, throughput, lock waits, deadlocks e crescimento do banco. Usar EXPLAIN/EXPLAIN ANALYZE em staging com dados sintéticos representativos (EXPLAIN ANALYZE executa a consulta); documentar baseline, volumes, concorrência e resultados antes/depois. Definir metas quantitativas com PO conforme capacidade e volume esperados; não afirmar ganho sem medição. Validar backup/restore, migrações e alterações DDL com estratégia de bloqueios e rollback/roll-forward.
+
+### 9.3. Gate de qualidade do schema (P0)
+
+Toda migration deve passar por MySQL real da versão adotada em CI, tanto instalação limpa quanto upgrade. Falhar o pipeline por ausência de comentários obrigatórios, objetos sem documentação complementar, violação de integridade ou regressão nos testes de concorrência. Exemplo de verificação de cobertura (executar no schema de teste, restringindo a objetos próprios):
+
+```sql
+SELECT TABLE_NAME
+FROM INFORMATION_SCHEMA.TABLES
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_TYPE = 'BASE TABLE'
+  AND TRIM(COALESCE(TABLE_COMMENT, '')) = '';
+
+SELECT c.TABLE_NAME, c.COLUMN_NAME
+FROM INFORMATION_SCHEMA.COLUMNS c
+JOIN INFORMATION_SCHEMA.TABLES t
+  ON t.TABLE_SCHEMA = c.TABLE_SCHEMA AND t.TABLE_NAME = c.TABLE_NAME
+WHERE c.TABLE_SCHEMA = DATABASE() AND t.TABLE_TYPE = 'BASE TABLE'
+  AND TRIM(COALESCE(c.COLUMN_COMMENT, '')) = '';
+```
+
+Ambas as consultas devem retornar zero linhas para objetos próprios. Complementar com validação de índices, rotinas, eventos e demais objetos via metadados/catálogo (deduplicar índices com múltiplas colunas e tratar objetos implícitos). Revisão humana verifica qualidade semântica dos comentários, não apenas presença. Exigir benchmark representativo das consultas críticas (save, IAP, ledger, fila, campanhas e dashboard) e validação de idempotência sob concorrência antes do lançamento.
+
+Exemplo ilustrativo (não é migration aprovada):
+
+```sql
+CREATE TABLE notification_outbox (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT
+        COMMENT 'Identificador interno da tarefa de envio',
+    status VARCHAR(20) NOT NULL
+        COMMENT 'Estado da tarefa conforme máquina de estados da fila',
+    scheduled_at DATETIME(6) NOT NULL
+        COMMENT 'Instante UTC a partir do qual o envio pode ser processado',
+    PRIMARY KEY (id),
+    KEY ix_outbox_status_schedule (status, scheduled_at, id)
+        COMMENT 'Seleção ordenada de tarefas elegíveis por estado e horário'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  COMMENT='Fila durável de tarefas de notificações push';
+```
+
+Referências oficiais: https://dev.mysql.com/doc/refman/8.4/en/create-table.html ; https://dev.mysql.com/doc/refman/8.4/en/create-index.html ; https://dev.mysql.com/doc/refman/8.4/en/create-procedure.html ; https://dev.mysql.com/doc/refman/8.4/en/create-event.html ; https://dev.mysql.com/doc/refman/8.4/en/example-auto-increment.html .
+
 ## 10. Contratos REST iniciais (nomes propostos)
 
 | Método e rota /api/v1 | Finalidade |
@@ -167,7 +225,7 @@ P0 = gate de lançamento comercial; P1 = LiveOps do MVP, preferencialmente antes
 
 | ID | Pri. | Entrega e dependência | Aceite mínimo |
 | --- | --- | --- | --- |
-| TBF-MVP-01 | P0 | Fundação PHP/MySQL, migrations, ambientes, CI, RBAC | API health, migrações em DB limpo, admin autenticado, zero segredos |
+| TBF-MVP-01 | P0 | Fundação PHP/MySQL, migrations, ambientes, CI, RBAC | API health, migrações em DB limpo e upgrade, admin autenticado, zero segredos, cobertura documental de 100% dos objetos próprios e gate MySQL (seções 9.1–9.3) |
 | TBF-MVP-02 | P0 | Identidade guest, Google, Facebook; depende 01 | Começa sem cadastro; vincula e restaura mesma fazenda; conflito não perde dados |
 | TBF-MVP-03 | P0 | Save local e Cloud Save; 01/02 | Fecha/reabre, migra schema, recupera novo dispositivo e reconcilia offline |
 | TBF-MVP-04 | P0 | Economy ledger e inventário; 03 | Replay e concorrência não duplicam saldo; preserva coleta e sete caixas |
@@ -178,7 +236,7 @@ P0 = gate de lançamento comercial; P1 = LiveOps do MVP, preferencialmente antes
 | TBF-MVP-09 | P1 | Templates, campanhas, segmentação, fila e histórico; 07/08 | Preview, envio teste, agendamento, opt-out, retry e tracking verificados |
 | TBF-MVP-10 | P1 | Motor de regras, recompensas, calendário; 04/09 | Benefício único por ocorrência, resgate seguro, dry run, pausa e limite econômico |
 | TBF-MVP-11 | P0 | Tutorial, missões, balanceamento, suporte, UI e regressão | Ciclo jogável completo em Android real, sem regressão do slice; parâmetros aprovados |
-| TBF-MVP-12 | P0 | Segurança, privacidade, backup, publicação controlada | Restauração testada, revisão Data Safety/exclusão, teste fechado, aceite humano |
+| TBF-MVP-12 | P0 | Segurança, privacidade, backup, publicação controlada | Restauração testada, revisão Data Safety/exclusão, benchmark MySQL das consultas críticas, teste fechado, aceite humano |
 | TBF-MVP-13 | P2 | A/B, automação avançada, OTP e iOS/Apple | Planejamento próprio após MVP e validação de loja |
 
 Ordem: 01 → 02 → 03 → 04 → 05; 06 e 07 podem avançar em paralelo após 01; 08 → 09 → 10 após dependências; 11 ao longo das entregas; 12 como gate final. Não reescrever o gameplay em um único PR.
