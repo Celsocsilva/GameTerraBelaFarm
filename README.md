@@ -58,6 +58,8 @@ Não apagar conteúdo legado, alterar regras econômicas ou substituir assets ap
 
 ## Arquitetura alvo
 
+A evolução comercial Android, backend PHP/MySQL, autenticação, compras reais, persistência, campanhas FCM e LiveOps está especificada em [docs/architecture/MVP_LIVEOPS.md](docs/architecture/MVP_LIVEOPS.md), com diagnóstico estático, prioridades e critérios de aceite. O documento é um plano de implementação, não uma declaração de funcionalidades entregues.
+
 O projeto deverá separar estado, regras de negócio, apresentação visual e integrações de plataforma:
 
 | Domínio | Responsabilidade |
@@ -224,3 +226,7 @@ Para executar a validação local:
     python -m unittest discover -s orchestration/tests -v
 
 O modo assistido não exige API de LLM: o CLI prepara o pacote e o operador encaminha-o à sessão apropriada de ChatGPT ou Claude. Adaptadores automáticos de LLM permanecem desativados por padrão.
+
+## Agentes v2.0.0
+
+12 especialistas e AGENT-00 coordenador. Consulte [matriz](docs/orchestration/agent-matrix.md) e [MVP LiveOps](docs/architecture/MVP_LIVEOPS.md). Registry é fonte de despacho; orquestração continua assistida, sem chamadas LLM automáticas.

@@ -21,3 +21,7 @@ Executável configurado para validações:
     C:\Users\Celso\OneDrive\Documentos\PROJECTS\Godot_v4.7.2-stable_win64\Godot_v4.7.2-stable_win64.exe
 
 O caminho é uma configuração de ambiente de desenvolvimento; confirme a existência do executável antes de executar validações headless.
+
+## v2.0.0 — novos domínios
+
+Criar tarefas FV distintas para entregas (TBF-MVP são grupos do roadmap). Exemplos após criação: dispatch FV-009 backend, dispatch FV-010 database, dispatch FV-011 liveops, dispatch FV-012 security. Operador consulta arquivo canônico e registra revisões cruzadas/gates. O despacho não executa agentes nem valida gates automaticamente. Validar com python tools/validate_agents.py e python -m unittest discover -s orchestration/tests -v.
