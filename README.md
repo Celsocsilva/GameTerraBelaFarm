@@ -58,6 +58,8 @@ Não apagar conteúdo legado, alterar regras econômicas ou substituir assets ap
 
 ## Arquitetura alvo
 
+A evolução comercial Android, backend PHP/MySQL, autenticação, compras reais, persistência, campanhas FCM e LiveOps está especificada em [docs/architecture/MVP_LIVEOPS.md](docs/architecture/MVP_LIVEOPS.md), com diagnóstico estático, prioridades e critérios de aceite. O documento é um plano de implementação, não uma declaração de funcionalidades entregues.
+
 O projeto deverá separar estado, regras de negócio, apresentação visual e integrações de plataforma:
 
 | Domínio | Responsabilidade |
