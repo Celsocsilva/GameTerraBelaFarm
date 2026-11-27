@@ -33,8 +33,9 @@ Rotas com 🔒 exigem `Authorization: Bearer <access_token>`.
 | `GET /health` | estado da API e versão do schema |
 | `POST /auth/guest` | `{}` cria visitante e devolve `guest_id` + `guest_secret` (**guardar em armazenamento protegido**; só vem uma vez). `{"guest_id","guest_secret"}` entra de novo |
 | `POST /auth/google` | `{"id_token","nonce?"}` do Credential Manager; o servidor valida assinatura, `iss`, `aud`, `exp` e `nonce` |
+| `POST /auth/apple` | `{"id_token","nonce?"}` do Sign in with Apple; valida assinatura (JWKS da Apple), `iss`, `aud` em `APPLE_CLIENT_IDS`, `exp` e `nonce` (bruto ou SHA-256). O e-mail do token não é guardado |
 | `POST /auth/facebook` | `{"access_token"}`; validado no Graph API `debug_token` com o app token do servidor |
-| 🔒 `POST /auth/link` | `{"provider":"google"\|"facebook", ...token}` vincula à fazenda atual. Se a conta já pertence a outra fazenda: **409 `account_conflict`** com `current_farm` e `other_farm`; nada é mesclado |
+| 🔒 `POST /auth/link` | `{"provider":"google"\|"facebook"\|"apple", ...token}` vincula à fazenda atual. Se a conta já pertence a outra fazenda: **409 `account_conflict`** com `current_farm` e `other_farm`; nada é mesclado |
 | `POST /auth/refresh` | `{"refresh_token"}` → novos tokens (o antigo morre; reapresentá-lo encerra a sessão) |
 | 🔒 `POST /auth/logout` | encerra a sessão deste aparelho |
 | 🔒 `GET /me` / `DELETE /me` | perfil, vínculos, preferências / pedido de exclusão (sessões revogadas, purge após `DELETION_GRACE_DAYS`) |
@@ -44,6 +45,7 @@ Rotas com 🔒 exigem `Authorization: Bearer <access_token>`.
 | 🔒 `POST /wallet/operations` | `{"operations":[{"operation_id","currency","amount","reason","reference?"}]}` até 50. Crédito de cash só com motivo permitido e dentro dos tetos; **gold nunca é creditado pelo app** |
 | 🔒 `GET /inventory` | direitos permanentes (`entitlements`) e carteira |
 | `GET /config?client_version=0.3.0` | Remote Config compatível, com `ETag` (responde 304) |
+| 🔒 `GET /experiments?client_version=0.4.0` | testes A/B em andamento: `experiments` (chave, variante, overrides) e `config` já mesclada. A variante é fixa por jogador; usar no lugar de `/config` depois do login |
 | 🔒 `POST /events/batch` | até 100 eventos `{"event_id","name","occurred_at?","app_version?","properties?"}`; nomes da lista do MVP; e-mail/token/nome nas propriedades são recusados |
 | 🔒 `POST /devices/register`, `DELETE /devices/{id}` | instalação + token FCM, idioma e fuso |
 | 🔒 `PUT /preferences/notifications` | `{"operational?","promotional?","os_permission_granted?"}` (histórico append-only; promocional começa desligado) |

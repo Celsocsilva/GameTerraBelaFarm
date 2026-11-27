@@ -74,6 +74,9 @@ final class DataExport
                 'rule' => $r['rule_key'], 'currency' => $r['currency'], 'amount' => $r['amount'] === null ? null : (int) $r['amount'], 'entitlement' => $r['entitlement_key'],
                 'status' => $r['status'], 'created_at' => $iso($r['created_at']), 'claimed_at' => $iso($r['claimed_at']), 'expires_at' => $iso($r['expires_at']),
             ], $db->all('SELECT rule_key, currency, amount, entitlement_key, status, created_at, claimed_at, expires_at FROM reward_grants WHERE player_id = ? ORDER BY id', [$playerId])),
+            'experiments' => array_map(fn ($r) => [
+                'experiment' => $r['experiment_key'], 'variant' => $r['variant_key'], 'first_seen_at' => $iso($r['first_exposed_at']),
+            ], $db->all('SELECT e.experiment_key, a.variant_key, a.first_exposed_at FROM experiment_assignments a JOIN experiments e ON e.id = a.experiment_id WHERE a.player_id = ? ORDER BY a.id', [$playerId])),
             'notifications_received' => (int) $db->one("SELECT COUNT(*) n FROM notification_outbox WHERE player_id = ? AND status = 'sent'", [$playerId])['n'],
             'game_events' => array_map(fn ($r) => [
                 'name' => $r['event_name'], 'at' => $iso($r['occurred_at']), 'app_version' => $r['app_version'], 'properties' => $r['properties'] === null ? null : json_decode($r['properties'], true),

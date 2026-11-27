@@ -65,7 +65,7 @@ curl -X POST https://skyplan.com.br/terrabelafarm/api/v1/auth/guest -H "Content-
 curl "https://skyplan.com.br/terrabelafarm/api/v1/config?client_version=0.3.0"
 ```
 
-- `health` deve mostrar `"schema_version":"003_backoffice_liveops"` e `"environment":"production"`.
+- `health` deve mostrar `"schema_version":"006_apple_login"` (ou a migration mais recente) e `"environment":"production"`.
 - `auth/guest` deve devolver `player_id`, `guest_secret` e `access_token` (é uma conta de teste; pode ignorar).
 - Confira que estes endereços **não** abrem (403/404): `/terrabelafarm/app-path.php`, `/terrabelafarm/.htaccess`, `/terrabelafarm_app/.env`.
 - Se `/api/v1/me` com o token responder 401 mesmo com token válido, a hospedagem está descartando o

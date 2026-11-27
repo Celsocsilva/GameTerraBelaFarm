@@ -37,6 +37,9 @@ pelo cron). Por isso os `ON DELETE CASCADE` abaixo só agiriam numa remoção ma
 | `fk_outbox_player` | notification_outbox.player_id → players.id (N:1). CASCADE. |
 | `fk_reward_rules_campaign` | reward_rules.notify_campaign_id → notification_campaigns.id (N:0..1). SET NULL: a regra continua sem aviso. |
 | `fk_reward_rules_created_by` | reward_rules.created_by → admin_users.id. SET NULL. |
+| `fk_experiments_created_by` | experiments.created_by → admin_users.id. SET NULL. |
+| `fk_experiment_assignments_experiment` | experiment_assignments.experiment_id → experiments.id (N:1). CASCADE. |
+| `fk_experiment_assignments_player` | experiment_assignments.player_id → players.id (N:1). CASCADE: a variante some com a conta. |
 | `fk_rule_executions_rule` | rule_executions.rule_id → reward_rules.id (N:1). CASCADE. |
 
 ## CHECK (MySQL 8.0.16+ e MariaDB 10.2+ aplicam; versões antigas apenas ignoram)
@@ -44,7 +47,7 @@ pelo cron). Por isso os `ON DELETE CASCADE` abaixo só agiriam numa remoção ma
 | Constraint | Regra |
 | --- | --- |
 | `ck_players_status` | status ∈ {active, deletion_requested, deleted}. |
-| `ck_identities_provider` | provider ∈ {guest, google, facebook}. |
+| `ck_identities_provider` | provider ∈ {guest, google, facebook, apple} (apple desde a migration 006). |
 | `ck_devices_platform` | platform ∈ {android, ios}. |
 | `ck_consents_granted` | granted ∈ {0, 1}. |
 | `ck_saves_revision` | revision ≥ 1 (a revisão 0 significa "sem save" e nunca é gravada). |
@@ -74,6 +77,8 @@ pelo cron). Por isso os `ON DELETE CASCADE` abaixo só agiriam numa remoção ma
 | `ck_reward_rules_status` | status ∈ {active, paused, retired}. |
 | `ck_reward_rules_currency` | currency nulo ou ∈ {cash, gold}. |
 | `ck_rule_executions_dry` | dry_run ∈ {0, 1}. |
+| `ck_experiments_status` | status ∈ {draft, running, stopped}. |
+| `ck_experiments_traffic` | traffic_percent ≤ 100. |
 
 Saldo não negativo: `wallets.cash_balance`, `wallets.gold_balance` e `economy_ledger.balance_after` são
 `BIGINT UNSIGNED`, então o próprio tipo impede saldo negativo; o serviço também verifica antes de gravar.

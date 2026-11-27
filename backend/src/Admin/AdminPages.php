@@ -50,6 +50,10 @@ final class AdminPages
             ['POST', '#^rules$#', 'rules.manage', fn () => $this->ruleCreate()],
             ['GET', '#^rules/(\d+)$#', 'view', fn ($m) => $this->rule((int) $m[1])],
             ['POST', '#^rules/(\d+)/(dryrun|run|activate|pause)$#', 'rules.manage', fn ($m) => $this->ruleAction((int) $m[1], $m[2])],
+            ['GET', '#^experiments$#', 'view', fn () => $this->experiments()],
+            ['POST', '#^experiments$#', 'experiments.manage', fn () => $this->experimentCreate()],
+            ['GET', '#^experiments/(\d+)$#', 'view', fn ($m) => $this->experiment((int) $m[1])],
+            ['POST', '#^experiments/(\d+)/(start|stop)$#', 'experiments.manage', fn ($m) => $this->experimentAction((int) $m[1], $m[2])],
             ['GET', '#^calendar$#', 'view', fn () => $this->calendar()],
             ['GET', '#^audit$#', 'audit.view', fn () => $this->audit()],
             ['GET', '#^users$#', 'users.manage', fn () => $this->users()],
@@ -975,6 +979,104 @@ final class AdminPages
             $res = $eng->run($id, $action === 'dryrun');
             $this->a->audit($action === 'dryrun' ? 'rule_dry_run' : 'rule_run', 'rule', $r['rule_key'], $res + ['version' => (int) $r['version']]);
             return $action === 'dryrun' ? "Simulação: {$res['eligible']} jogadores elegíveis agora (nada foi concedido)." : "Executada: {$res['granted']} benefícios concedidos de {$res['eligible']} elegíveis.";
+        });
+    }
+
+    // ------------------------------------------------------------------ testes A/B
+
+    private function experiments(): Response
+    {
+        $rows = $this->a->db->all('SELECT e.*, (SELECT COUNT(*) FROM experiment_assignments a WHERE a.experiment_id = e.id) exposed FROM experiments e ORDER BY e.id DESC LIMIT 200');
+        $body = View::table($rows, [
+            'Experimento' => fn ($r) => '<a href="' . $this->url('experiments/' . $r['id']) . '">' . View::h($r['experiment_key']) . '</a>',
+            'name' => 'Nome',
+            'Variantes' => fn ($r) => View::h(implode(' / ', array_map(static fn ($v) => $v['key'] . ' ' . $v['weight'], json_decode($r['variants'], true)))),
+            'Tráfego' => fn ($r) => View::h($r['traffic_percent'] . '%'),
+            'exposed' => 'Expostos',
+            'Estado' => fn ($r) => self::stateBadge($r['status'] === 'running' ? 'active' : $r['status']),
+            'Início' => fn ($r) => View::dt($r['started_at']),
+        ], 'Nenhum teste A/B ainda.');
+        if ($this->a->can('experiments.manage')) {
+            $sample = '[{"key":"control","weight":50,"overrides":{}},{"key":"b","weight":50,"overrides":{"features":{"store_enabled":true}}}]';
+            $body .= '<h2>Novo teste A/B</h2><div class="card"><p class="muted">Nasce como rascunho. Cada variante só pode mudar <code>features</code>, <code>routes</code> e <code>tuning</code> do Remote Config; limites de economia, manutenção e sync nunca entram em teste. A divisão é fixa por jogador: quem recebeu uma variante continua nela até o fim. Ao encerrar, todos voltam ao Remote Config publicado; para adotar a vencedora, publique uma nova versão do Remote Config.</p>'
+                . $this->form('experiments', '<label>Chave (usada pelo app)</label><input name="experiment_key" required pattern="[a-z][a-z0-9_]{2,47}" placeholder="loja_aberta_v1">'
+                    . '<label>Nome</label><input name="name" required maxlength="120">'
+                    . '<label>Hipótese e métrica de sucesso</label><input name="hypothesis" maxlength="500" placeholder="Abrir a loja aumenta compradores sem cair a retenção D1">'
+                    . '<label>Percentual de jogadores no teste</label><input name="traffic_percent" type="number" min="1" max="100" value="100">'
+                    . '<label>Evento de meta (opcional, nome do evento de telemetria)</label><input name="goal_event" pattern="[a-z][a-z0-9_]{1,39}" placeholder="shop_open">'
+                    . '<label>Versão mínima do app</label><input name="min_client_version" value="0.0.0" pattern="\\d+(\\.\\d+){0,3}">'
+                    . '<label>Variantes (JSON: key, weight, overrides)</label><textarea name="variants" rows="5" required>' . View::h($sample) . '</textarea>',
+                    'stack', 'Criar rascunho') . '</div>';
+        }
+        return $this->a->render('Testes A/B', $body, 'experiments');
+    }
+
+    private function experimentCreate(): Response
+    {
+        $id = null;
+        $resp = $this->a->act('experiments.manage', 'experiments', function (array $f) use (&$id) {
+            $id = $this->a->app->experiments->create($f, (int) $this->a->s['id']);
+            $e = $this->a->app->experiments->get($id);
+            $this->a->audit('experiment_create', 'experiment', $e['experiment_key'], ['traffic_percent' => (int) $e['traffic_percent'], 'variants' => json_decode($e['variants'], true)]);
+            return 'Rascunho criado. Confira as variantes e inicie.';
+        });
+        return $id === null ? $resp : $this->a->redirect('experiments/' . $id);
+    }
+
+    private function experiment(int $id): Response
+    {
+        $e = $this->a->db->one('SELECT * FROM experiments WHERE id = ?', [$id]);
+        if ($e === null) {
+            return $this->a->render('Teste não encontrado', '', 'experiments', 404);
+        }
+        $variants = json_decode($e['variants'], true);
+        $body = '<div class="card">' . View::dl([
+                'Chave' => $e['experiment_key'], 'Nome' => $e['name'], 'Hipótese' => $e['hypothesis'] ?? '—', 'Estado' => $e['status'],
+                'Tráfego' => $e['traffic_percent'] . '%', 'Evento de meta' => $e['goal_event'] ?? '—', 'Versão mínima do app' => $e['min_client_version'],
+                'Início' => View::dt($e['started_at']), 'Fim' => View::dt($e['stopped_at']), 'Vencedora' => $e['winner_variant'] ?? '—',
+            ]) . '</div><h2>Variantes</h2>' . View::table($variants, [
+                'key' => 'Variante', 'weight' => 'Peso',
+                'Sobrescreve' => fn ($v) => '<code>' . View::h(json_encode($v['overrides'] ?: new \stdClass(), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) . '</code>',
+            ]);
+        $pct = static fn ($v) => $v === null ? '—' : number_format((float) $v, 1, ',', '.') . '%';
+        $res = $this->a->app->experiments->results($id);
+        $body .= '<h2>Resultados</h2><p class="muted">D1 e D7: jogou de novo entre 24 e 48 h (ou entre 7 e 8 dias) depois da primeira exposição, contando só quem já completou essa janela. Compradores: compra concedida depois da exposição. Diferenças pequenas com poucos jogadores não são conclusivas; espere algumas centenas por variante.</p>'
+            . View::table($res, [
+                'variant' => 'Variante', 'exposed' => 'Expostos',
+                'Retenção D1' => fn ($r) => View::h($pct($r['d1_pct']) . ' de ' . $r['d1_base']),
+                'Retenção D7' => fn ($r) => View::h($pct($r['d7_pct']) . ' de ' . $r['d7_base']),
+                'Compradores' => fn ($r) => View::h($r['buyers'] . ' (' . $pct($r['buyers_pct']) . ')'),
+                'Meta' => fn ($r) => View::h($r['converted'] === null ? '—' : $r['converted'] . ' (' . $pct($r['converted_pct']) . ')'),
+            ]);
+        if ($this->a->can('experiments.manage')) {
+            if ($e['status'] === 'draft') {
+                $body .= '<h2>Ações</h2>' . $this->form('experiments/' . $id . '/start', '', 'inline', 'Iniciar teste');
+            } elseif ($e['status'] === 'running') {
+                $opts = [];
+                foreach ($variants as $v) {
+                    $opts[$v['key']] = $v['key'];
+                }
+                $body .= '<h2>Encerrar</h2><div class="card"><p class="muted">Todos voltam ao Remote Config publicado. Registre a vencedora (opcional) e publique uma nova versão do Remote Config para adotá-la.</p>'
+                    . $this->form('experiments/' . $id . '/stop', '<label>Vencedora</label>' . View::select('winner', $opts, null, true), 'stack', 'Encerrar teste', 'danger') . '</div>';
+            }
+        }
+        return $this->a->render('Teste A/B ' . $e['experiment_key'], $body, 'experiments');
+    }
+
+    private function experimentAction(int $id, string $action): Response
+    {
+        return $this->a->act('experiments.manage', 'experiments/' . $id, function (array $f) use ($id, $action) {
+            $svc = $this->a->app->experiments;
+            $e = $svc->get($id);
+            if ($action === 'start') {
+                $svc->start($id);
+                $this->a->audit('experiment_start', 'experiment', $e['experiment_key'], []);
+                return 'Teste iniciado: o app recebe as variantes em /experiments.';
+            }
+            $winner = ($f['winner'] ?? '') === '' ? null : (string) $f['winner'];
+            $svc->stop($id, $winner);
+            $this->a->audit('experiment_stop', 'experiment', $e['experiment_key'], ['winner' => $winner]);
+            return 'Teste encerrado.' . ($winner === null ? '' : " Vencedora: $winner. Publique o Remote Config para adotá-la.");
         });
     }
 

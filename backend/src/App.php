@@ -12,6 +12,7 @@ use TerraBela\Api\MeApi;
 use TerraBela\Api\SaveApi;
 use TerraBela\Api\V;
 use TerraBela\Api\WalletApi;
+use TerraBela\Auth\AppleIdTokenVerifier;
 use TerraBela\Auth\FacebookTokenVerifier;
 use TerraBela\Auth\GoogleIdTokenVerifier;
 use TerraBela\Auth\JwksCache;
@@ -32,6 +33,7 @@ use TerraBela\Http\Request;
 use TerraBela\Http\Response;
 use TerraBela\Http\Router;
 use TerraBela\LiveOps\CampaignService;
+use TerraBela\LiveOps\ExperimentService;
 use TerraBela\LiveOps\FcmClient;
 use TerraBela\LiveOps\MetricsService;
 use TerraBela\LiveOps\RuleEngine;
@@ -60,6 +62,7 @@ final class App
     public readonly RateLimiter $limiter;
     public readonly BackupService $backups;
     public readonly DataExport $exporter;
+    public readonly ExperimentService $experiments;
     private Router $router;
     private ?AdminApp $admin = null;
 
@@ -92,9 +95,10 @@ final class App
         $backupDir = $config->optional('BACKUP_DIR') ?? ($storage ?? sys_get_temp_dir()) . '/backups';
         $this->backups = new BackupService($this->db, $this->clock, $backupDir, $config->int('BACKUP_KEEP', 14), $config->optional('BACKUP_ENCRYPTION_KEY'));
         $this->exporter = new DataExport($this->db, $this->clock);
+        $this->experiments = new ExperimentService($this->db, $this->clock, $this->remoteConfig);
         $this->iap = new IapService($this->db, $this->clock, $this->ledger, $play, $google, $this->log, $config->optional('RTDN_AUDIENCE'), $config->optional('RTDN_SERVICE_ACCOUNT_EMAIL'));
 
-        $auth = new AuthApi($this->db, $this->clock, $this->tokens, $this->players, $google, $facebook, $config->list('GOOGLE_CLIENT_IDS'), $appKey);
+        $auth = new AuthApi($this->db, $this->clock, $this->tokens, $this->players, $google, $facebook, $config->list('GOOGLE_CLIENT_IDS'), $appKey, new AppleIdTokenVerifier($jwks, $this->clock), $config->list('APPLE_CLIENT_IDS'));
         $me = new MeApi($this->db, $this->clock, $this->players, $this->tokens, $config->int('DELETION_GRACE_DAYS', 30));
         $save = new SaveApi($this->db, $this->clock, $this->ledger, $this->remoteConfig, $config->int('SAVE_HISTORY', 10), $config->int('SAVE_MAX_BYTES', 262144));
         $wallet = new WalletApi($this->db, $this->ledger, $this->remoteConfig);
@@ -107,6 +111,7 @@ final class App
         $r->add('GET', $p . '/health', fn () => $this->health());
         $r->add('POST', $p . '/auth/guest', $auth->guest(...), ['rate' => 'auth']);
         $r->add('POST', $p . '/auth/google', $auth->google(...), ['rate' => 'auth']);
+        $r->add('POST', $p . '/auth/apple', $auth->apple(...), ['rate' => 'auth']);
         $r->add('POST', $p . '/auth/facebook', $auth->facebook(...), ['rate' => 'auth']);
         $r->add('POST', $p . '/auth/refresh', $auth->refresh(...), ['rate' => 'auth']);
         $r->add('POST', $p . '/auth/link', $auth->link(...), ['auth' => true, 'rate' => 'auth']);
@@ -125,6 +130,11 @@ final class App
         $r->add('POST', $p . '/wallet/operations', $wallet->operations(...), ['auth' => true]);
         $r->add('GET', $p . '/inventory', $wallet->inventory(...), ['auth' => true]);
         $r->add('GET', $p . '/config', $cfg->get(...), ['rate' => 'public']);
+        $r->add('GET', $p . '/experiments', function (Request $q, $ctx) {
+            $v = $q->query['client_version'] ?? null;
+            $v = is_string($v) && preg_match('/^\d+(\.\d+){0,3}$/', $v) ? $v : null;
+            return Response::json($this->experiments->forPlayer($ctx->playerId, $v), 200, ['Cache-Control' => 'private, no-store']);
+        }, ['auth' => true]);
         $r->add('POST', $p . '/events/batch', $events->batch(...), ['auth' => true]);
         $r->add('POST', $p . '/notifications/{id}/open', $events->notificationOpen(...), ['auth' => true]);
         $r->add('POST', $p . '/devices/register', $devices->register(...), ['auth' => true]);

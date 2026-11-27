@@ -77,6 +77,10 @@ file_put_contents($saFile, json_encode(['client_email' => 'play@test.iam.gservic
 $playPurchases = [];
 $http = new FakeHttpClient();
 $http->on('GET', 'https://www.googleapis.com/oauth2/v3/certs', fn () => [200, $jwks, ['cache-control' => 'public, max-age=3600']]);
+$appleKey = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+openssl_pkey_export($appleKey, $applePem);
+$ad = openssl_pkey_get_details($appleKey)['rsa'];
+$http->on('GET', 'https://appleid.apple.com/auth/keys', fn () => [200, ['keys' => [['kty' => 'RSA', 'kid' => 'apple-kid', 'alg' => 'RS256', 'use' => 'sig', 'n' => Ids::b64urlEncode($ad['n']), 'e' => Ids::b64urlEncode($ad['e'])]]], ['cache-control' => 'public, max-age=3600']]);
 $http->on('POST', 'https://oauth2.googleapis.com/token', fn () => [200, ['access_token' => 'ya29.fake', 'expires_in' => 3600]]);
 $http->on('GET', 'https://graph.facebook.com/', function (string $url) {
     parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
@@ -171,7 +175,7 @@ test('health e rota inexistente', function () use ($makeApp) {
     $c = new Client($makeApp());
     $r = $c->call('GET', '/health');
     eq(200, $r->status, 'health 200');
-    eq('004_perf_indexes', $c->last['schema_version'], 'versão do schema');
+    eq('006_apple_login', $c->last['schema_version'], 'versão do schema');
     check(isset($r->headers['X-Request-Id']), 'X-Request-Id presente');
     eq(404, $c->call('GET', '/nao-existe')->status, '404');
     eq(405, $c->call('DELETE', '/health')->status, '405');
@@ -1031,6 +1035,146 @@ test('MVP-12 exportação de dados do jogador (LGPD)', function () use ($makeApp
     eq(200, $b->req('GET', 'system')->status, 'admin vê sistema/backup');
     $b->post('system/backup');
     check(str_contains($b->flash(), 'Backup criado'), 'backup pelo painel: ' . $b->flash());
+});
+
+test('MVP-13a testes A/B: divisão estável, só seções de jogo, exposição e resultados', function () use ($makeApp) {
+    $app = $makeApp();
+    $app->db->exec('DELETE FROM rate_limits');
+    $svc = $app->experiments;
+    $bad = [
+        '[{"key":"a","weight":50,"overrides":{}}]' => 'uma variante só',
+        '[{"key":"a","weight":50,"overrides":{}},{"key":"a","weight":50,"overrides":{}}]' => 'chave repetida',
+        '[{"key":"a","weight":50,"overrides":{}},{"key":"b","weight":50,"overrides":{"economy":{"client_credit":{"cash":{"max_per_day":999999999}}}}}]' => 'economia',
+        '[{"key":"a","weight":50,"overrides":{}},{"key":"b","weight":50,"overrides":{"maintenance":{"enabled":true}}}]' => 'manutenção',
+        '[{"key":"a","weight":50,"overrides":{}},{"key":"b","weight":50,"overrides":{"features":{"store_enabled":"sim"}}}]' => 'feature não booleana',
+        '[{"key":"a","weight":0,"overrides":{}},{"key":"b","weight":0,"overrides":{}}]' => 'pesos zerados',
+    ];
+    foreach ($bad as $json => $why) {
+        $ok = false;
+        try {
+            $svc->create(['experiment_key' => 'bad_' . bin2hex(random_bytes(3)), 'name' => 'x', 'variants' => $json], null);
+        } catch (\InvalidArgumentException) {
+            $ok = true;
+        }
+        check($ok, "recusa variante inválida: $why");
+    }
+
+    // divisão determinística e equilibrada
+    $e = ['salt' => 'abcdef0123456789', 'experiment_key' => 'dist', 'traffic_percent' => 100];
+    $vs = [['key' => 'a', 'weight' => 50], ['key' => 'b', 'weight' => 50]];
+    $count = ['a' => 0, 'b' => 0];
+    for ($i = 0; $i < 4000; $i++) {
+        $count[\TerraBela\LiveOps\ExperimentService::pick($e, $vs, bin2hex(hash('md5', "p$i", true)))]++;
+    }
+    check(abs($count['a'] - 2000) < 160, 'divisão 50/50 equilibrada: ' . json_encode($count));
+    $h = bin2hex(random_bytes(16));
+    eq(\TerraBela\LiveOps\ExperimentService::pick($e, $vs, $h), \TerraBela\LiveOps\ExperimentService::pick($e, $vs, $h), 'mesmo jogador, mesma variante');
+    $in = 0;
+    for ($i = 0; $i < 2000; $i++) {
+        $in += \TerraBela\LiveOps\ExperimentService::pick(['traffic_percent' => 20] + $e, $vs, bin2hex(hash('md5', "q$i", true))) === null ? 0 : 1;
+    }
+    check($in > 320 && $in < 480, "20% de tráfego: $in de 2000");
+
+    // pelo backoffice: leitura não cria, operação cria e inicia
+    [$re, $rp] = make_admin($app, 'read', 'read-ab@example.test');
+    $ro = new AdminClient($app);
+    $ro->login($re, $rp);
+    eq(200, $ro->req('GET', 'experiments')->status, 'leitura abre testes A/B');
+    $key = 'loja_' . bin2hex(random_bytes(3));
+    $form = ['experiment_key' => $key, 'name' => 'Loja aberta', 'traffic_percent' => '100', 'goal_event' => 'shop_open', 'min_client_version' => '0.0.0',
+        'variants' => '[{"key":"control","weight":50,"overrides":{}},{"key":"loja","weight":50,"overrides":{"features":{"store_enabled":true},"tuning":{"shop_banner":"v2"}}}]'];
+    eq(403, $ro->post('experiments', $form)->status, 'leitura não cria teste');
+    [$oe, $op] = make_admin($app, 'operation', 'op-ab@example.test');
+    $o = new AdminClient($app);
+    $o->login($oe, $op);
+    $o->post('experiments', $form);
+    $id = (int) $app->db->one('SELECT id FROM experiments WHERE experiment_key = ?', [$key])['id'];
+    check($id > 0, 'operação cria rascunho: ' . $o->flash());
+
+    $c = new Client($app);
+    $g = $c->guest();
+    $c->call('GET', '/experiments');
+    check(!in_array($key, array_column($c->last['experiments'], 'key'), true), 'rascunho não chega ao app');
+    $o->post("experiments/$id/start");
+    check(str_contains($o->flash(), 'iniciado'), 'iniciado: ' . $o->flash());
+    eq(200, $c->call('GET', '/experiments', null, [], ['client_version' => '0.4.0'])->status, 'GET /experiments 200');
+    $mine = array_values(array_filter($c->last['experiments'], fn ($x) => $x['key'] === $key))[0] ?? null;
+    check($mine !== null && in_array($mine['variant'], ['control', 'loja'], true), 'jogador recebe uma variante');
+    eq($mine['variant'] === 'loja', $c->last['config']['features']['store_enabled'], 'config mesclada com a variante');
+    eq(5000, $c->last['config']['economy']['client_credit']['cash']['max_per_operation'] ?? null, 'economia nunca muda');
+    $c->call('GET', '/experiments');
+    $again = array_values(array_filter($c->last['experiments'], fn ($x) => $x['key'] === $key))[0]['variant'];
+    eq($mine['variant'], $again, 'variante estável entre chamadas');
+    eq(1, (int) $app->db->one('SELECT COUNT(*) n FROM experiment_assignments WHERE experiment_id = ?', [$id])['n'], 'uma atribuição gravada');
+    eq(401, (new Client($app))->call('GET', '/experiments')->status, 'exige login');
+
+    // resultados: 2 jogadores por variante expostos há 10 dias, um volta no D1 e no D7
+    $pids = [];
+    foreach (['control', 'control', 'loja', 'loja'] as $i => $v) {
+        $cc = new Client($app);
+        $gg = $cc->guest();
+        $pid = (int) $app->db->one('SELECT id FROM players WHERE public_id = ?', [Ids::uuidToBin($gg['player_id'])])['id'];
+        $t = $app->clock->sql(-10 * 86400);
+        $app->db->exec('INSERT INTO experiment_assignments (experiment_id, player_id, variant_key, first_exposed_at, last_exposed_at) VALUES (?, ?, ?, ?, ?)', [$id, $pid, $v, $t, $t]);
+        if ($i % 2 === 0) {
+            foreach ([-9 * 86400 + 3600, -3 * 86400 + 3600] as $k => $off) {
+                $app->db->exec("INSERT INTO game_events (event_id, player_id, event_name, occurred_at, received_at) VALUES (?, ?, 'shop_open', ?, ?)", ['ab-' . bin2hex(random_bytes(6)), $pid, $app->clock->sql($off), $app->clock->sql()]);
+            }
+        }
+    }
+    $res = array_column($svc->results($id), null, 'variant');
+    eq(2, $res['loja']['d1_base'], 'base D1 só com quem completou a janela');
+    eq(50.0, $res['loja']['d1_pct'], 'D1 50%');
+    eq(50.0, $res['control']['d7_pct'], 'D7 50%');
+    eq(1, $res['loja']['converted'], 'conversão no evento de meta');
+    $page = $o->req('GET', "experiments/$id");
+    check(str_contains($page->body, 'Retenção D1') && str_contains($page->body, '50,0%'), 'tela mostra resultados');
+
+    $o->post("experiments/$id/stop", ['winner' => 'loja']);
+    eq('stopped', $svc->get($id)['status'], 'encerrado');
+    eq('loja', $svc->get($id)['winner_variant'], 'vencedora registrada');
+    $c->call('GET', '/experiments');
+    check(!in_array($key, array_column($c->last['experiments'], 'key'), true), 'encerrado não chega ao app');
+    eq(3, (int) $app->db->one("SELECT COUNT(*) n FROM admin_audit_log WHERE action IN ('experiment_create','experiment_start','experiment_stop') AND target_id = ?", [$key])['n'], 'criação, início e fim auditados');
+    $c->call('GET', '/me/export');
+    eq($mine['variant'], $c->last['experiments'][0]['variant'] ?? null, 'exportação LGPD inclui a variante');
+});
+
+test('MVP-13b Sign in with Apple: login, nonce, audience, vínculo e conflito', function () use ($makeApp, $applePem, $googlePem) {
+    eq(503, (new Client($makeApp(['APPLE_CLIENT_IDS' => ''])))->call('POST', '/auth/apple', ['id_token' => str_repeat('x', 30)])->status, 'sem APPLE_CLIENT_IDS: 503');
+    $app = $makeApp(['APPLE_CLIENT_IDS' => 'com.terrabela.farm,com.terrabela.farm.web']);
+    $app->db->exec('DELETE FROM rate_limits');
+    $now = time();
+    $raw = 'nonce-bruto-' . bin2hex(random_bytes(4));
+    $sub = '001234.' . bin2hex(random_bytes(8)) . '.0101';
+    $claims = ['iss' => 'https://appleid.apple.com', 'aud' => 'com.terrabela.farm', 'sub' => $sub, 'iat' => $now, 'exp' => $now + 600, 'nonce' => hash('sha256', $raw), 'email' => 'abc@privaterelay.appleid.com'];
+    $tok = fn (array $c, ?string $pem = null) => \TerraBela\Auth\Jwt::signRs256($c, $pem ?? $applePem, 'apple-kid');
+    $c = new Client($app);
+    eq(200, $c->call('POST', '/auth/apple', ['id_token' => $tok($claims), 'nonce' => $raw])->status, 'login Apple com nonce (hash SHA-256)');
+    eq(true, $c->last['created'], 'primeiro login Apple cria fazenda');
+    $farm = $c->last['player_id'];
+    $c->call('POST', '/auth/apple', ['id_token' => $tok(['nonce' => 'n-direto'] + $claims), 'nonce' => 'n-direto']);
+    eq($farm, $c->last['player_id'], 'segundo login volta à mesma fazenda (nonce sem hash também vale)');
+    eq(401, $c->call('POST', '/auth/apple', ['id_token' => $tok($claims), 'nonce' => 'outro'])->status, 'nonce diferente');
+    eq(401, $c->call('POST', '/auth/apple', ['id_token' => $tok(['aud' => 'com.outro.app'] + $claims)])->status, 'audience errada');
+    eq(401, $c->call('POST', '/auth/apple', ['id_token' => $tok(['iss' => 'https://accounts.google.com'] + $claims)])->status, 'issuer errado');
+    eq(401, $c->call('POST', '/auth/apple', ['id_token' => $tok(['exp' => $now - 3600] + $claims)])->status, 'token expirado');
+    eq(401, $c->call('POST', '/auth/apple', ['id_token' => \TerraBela\Auth\Jwt::signRs256($claims, $googlePem, 'apple-kid')])->status, 'assinatura de outra chave');
+    eq(0, (int) $app->db->one("SELECT COUNT(*) n FROM player_identities WHERE provider = 'apple' AND subject LIKE '%privaterelay%'")['n'], 'e-mail não é guardado');
+    eq('apple', $app->db->one('SELECT login_provider FROM player_sessions ORDER BY id DESC LIMIT 1')['login_provider'], 'sessão registra apple');
+
+    $v = new Client($app);
+    $guest = $v->guest();
+    $sub2 = '001234.' . bin2hex(random_bytes(8)) . '.0202';
+    $v->call('POST', '/auth/link', ['provider' => 'apple', 'id_token' => $tok(['sub' => $sub2, 'aud' => 'com.terrabela.farm.web'] + $claims), 'nonce' => $raw]);
+    eq(true, $v->last['linked'] ?? null, 'visitante vincula Apple (Services ID)');
+    $n = new Client($app);
+    $n->call('POST', '/auth/apple', ['id_token' => $tok(['sub' => $sub2] + $claims)]);
+    eq($guest['player_id'], $n->last['player_id'], 'outro aparelho recupera a fazenda pelo Apple');
+    eq(409, $v->call('POST', '/auth/link', ['provider' => 'apple', 'id_token' => $tok($claims)])->status, 'Apple de outra fazenda: conflito, sem mesclar');
+    $n->access = $n->last['access_token'];
+    $n->call('GET', '/me');
+    check(in_array('apple', array_column($n->last['identities'], 'provider'), true), '/me lista apple');
 });
 
 test('dicionário de dados: 100% de COMMENT', function () {

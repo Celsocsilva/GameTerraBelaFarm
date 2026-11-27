@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace TerraBela\Api;
 
+use TerraBela\Auth\AppleIdTokenVerifier;
 use TerraBela\Auth\AuthContext;
 use TerraBela\Auth\FacebookTokenVerifier;
 use TerraBela\Auth\GoogleIdTokenVerifier;
@@ -16,12 +17,12 @@ use TerraBela\Http\Request;
 use TerraBela\Players\PlayerService;
 
 /**
- * POST /auth/guest, /auth/google, /auth/facebook, /auth/link, /auth/refresh, /auth/logout.
+ * POST /auth/guest, /auth/google, /auth/apple, /auth/facebook, /auth/link, /auth/refresh, /auth/logout.
  * Contas nunca são unidas por e-mail; conflitos devolvem 409 com resumo das duas fazendas.
  */
 final class AuthApi
 {
-    /** @param list<string> $googleClientIds */
+    /** @param list<string> $googleClientIds @param list<string> $appleClientIds */
     public function __construct(
         private Db $db,
         private Clock $clock,
@@ -31,6 +32,8 @@ final class AuthApi
         private FacebookTokenVerifier $facebook,
         private array $googleClientIds,
         private string $appKey,
+        private ?AppleIdTokenVerifier $apple = null,
+        private array $appleClientIds = [],
     ) {
     }
 
@@ -84,6 +87,21 @@ final class AuthApi
         return $this->loginWith($identity, $req);
     }
 
+    /** Sign in with Apple: identity_token do ASAuthorizationAppleIDCredential (iOS) ou do fluxo web/Android. */
+    public function apple(Request $req): array
+    {
+        $in = $req->json();
+        return $this->loginWith($this->appleIdentity($in), $req);
+    }
+
+    private function appleIdentity(array $in): ProviderIdentity
+    {
+        if ($this->apple === null) {
+            throw new ApiException(503, 'provider_not_configured', 'Login com Apple ainda não está configurado no servidor.');
+        }
+        return $this->apple->identity(V::str($in, 'id_token', 20, 4096), $this->appleClientIds, V::optStr($in, 'nonce', 128));
+    }
+
     public function facebook(Request $req): array
     {
         $in = $req->json();
@@ -91,14 +109,16 @@ final class AuthApi
         return $this->loginWith($identity, $req);
     }
 
-    /** Vincula Google/Facebook à fazenda atual (o visitante passa a poder recuperar a conta). */
+    /** Vincula Google/Facebook/Apple à fazenda atual (o visitante passa a poder recuperar a conta). */
     public function link(Request $req, AuthContext $ctx): array
     {
         $in = $req->json();
-        $provider = V::enum($in, 'provider', ['google', 'facebook']);
-        $identity = $provider === 'google'
-            ? $this->google->identity(V::str($in, 'id_token', 20, 4096), $this->googleClientIds, V::optStr($in, 'nonce', 128))
-            : $this->facebook->identity(V::str($in, 'access_token', 20, 4096));
+        $provider = V::enum($in, 'provider', ['google', 'facebook', 'apple']);
+        $identity = match ($provider) {
+            'google' => $this->google->identity(V::str($in, 'id_token', 20, 4096), $this->googleClientIds, V::optStr($in, 'nonce', 128)),
+            'apple' => $this->appleIdentity($in),
+            default => $this->facebook->identity(V::str($in, 'access_token', 20, 4096)),
+        };
 
         return $this->db->tx(function (Db $db) use ($identity, $ctx) {
             $existing = $db->one(

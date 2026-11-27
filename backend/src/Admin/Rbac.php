@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace TerraBela\Admin;
 
 /**
- * Papéis do backoffice. admin: tudo. operation: LiveOps (config, campanhas, regras, produtos).
+ * Papéis do backoffice. admin: tudo. operation: LiveOps (config, campanhas, regras, testes A/B, produtos).
  * support: atendimento (benefício a jogador, revogar sessões). read: somente leitura.
  */
 final class Rbac
@@ -24,6 +24,7 @@ final class Rbac
         'products.manage' => ['admin', 'operation'],
         'campaigns.manage' => ['admin', 'operation'],
         'rules.manage' => ['admin', 'operation'],
+        'experiments.manage' => ['admin', 'operation'],
         'audit.view' => ['admin', 'operation'],
         'users.manage' => ['admin'],
         'system.manage' => ['admin'],

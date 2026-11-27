@@ -140,6 +140,55 @@ Itens permanentes concedidos pelo servidor (domínio: economia)
 | `PRIMARY` | id | sim | Chave interna |
 | `uq_entitlements_player_key` | player_id,entitlement_key | sim | Um direito por chave por jogador (concessão idempotente); atende a FK |
 
+## `experiment_assignments`
+
+Variante de cada jogador em cada experimento A/B (domínio: LiveOps)
+
+| Coluna | Tipo | Nulo | Padrão | Descrição |
+| --- | --- | --- | --- | --- |
+| `id` | bigint unsigned | não |  | Identificador interno da atribuição |
+| `experiment_id` | int unsigned | não |  | Experimento (FK experiments.id) |
+| `player_id` | bigint unsigned | não |  | Jogador atribuído (FK players.id) |
+| `variant_key` | varchar(32) | não |  | Variante recebida; fixa para o jogador mesmo se os pesos mudarem |
+| `first_exposed_at` | datetime(6) | não |  | Instante UTC da primeira entrega da variante ao app (início da janela de resultado) |
+| `last_exposed_at` | datetime(6) | não |  | Instante UTC da entrega mais recente |
+
+| Índice | Colunas | Único | Descrição |
+| --- | --- | --- | --- |
+| `ix_experiment_assignments_player` | player_id | não | Atende a FK player_id e a exportação/exclusão do jogador |
+| `ix_experiment_assignments_variant` | experiment_id,variant_key,first_exposed_at | não | Resultados por variante e janela de exposição |
+| `PRIMARY` | id | sim | Chave interna |
+| `uq_experiment_assignments_player` | experiment_id,player_id | sim | Uma variante por jogador e experimento |
+
+## `experiments`
+
+Testes A/B sobre o Remote Config (domínio: LiveOps)
+
+| Coluna | Tipo | Nulo | Padrão | Descrição |
+| --- | --- | --- | --- | --- |
+| `id` | int unsigned | não |  | Identificador interno do experimento |
+| `experiment_key` | varchar(48) | não |  | Chave estável usada pelo app (ex.: shop_layout_v2) |
+| `name` | varchar(120) | não |  | Nome humano mostrado no backoffice |
+| `hypothesis` | varchar(500) | sim |  | Hipótese e métrica de sucesso escritas pelo operador |
+| `status` | varchar(16) | não | `draft` | Estado: draft (editável), running (atribuindo), stopped (encerrado, todos voltam ao padrão) |
+| `traffic_percent` | tinyint unsigned | não | `100` | Percentual dos jogadores que entram no experimento (0 a 100); o resto fica no padrão |
+| `variants` | json | não |  | Lista de variantes [{"key","weight","overrides"}]; overrides só em features, routes e tuning |
+| `salt` | char(16) | não |  | Sal aleatório da divisão; muda a distribuição sem depender da chave |
+| `goal_event` | varchar(40) | sim |  | Evento de telemetria contado como conversão nos resultados; NULL sem meta própria |
+| `min_client_version` | varchar(32) | não | `0.0.0` | Versão mínima do app que participa (versões antigas ficam no padrão) |
+| `winner_variant` | varchar(32) | sim |  | Variante escolhida ao encerrar; NULL sem decisão (a aplicação é feita publicando o Remote Config) |
+| `created_by` | int unsigned | sim |  | Operador que criou (FK admin_users.id); NULL se pelo sistema |
+| `created_at` | datetime(6) | não | `CURRENT_TIMESTAMP(6)` | Instante UTC de criação |
+| `started_at` | datetime(6) | sim |  | Instante UTC em que começou a atribuir; NULL em rascunho |
+| `stopped_at` | datetime(6) | sim |  | Instante UTC do encerramento; NULL enquanto não encerrado |
+
+| Índice | Colunas | Único | Descrição |
+| --- | --- | --- | --- |
+| `ix_experiments_created_by` | created_by | não | Atende a FK created_by |
+| `ix_experiments_status` | status | não | Seleção dos experimentos em andamento a cada requisição do app |
+| `PRIMARY` | id | sim | Chave interna |
+| `uq_experiments_key` | experiment_key | sim | Chave única por experimento |
+
 ## `game_events`
 
 Telemetria client-side recebida em lote (domínio: analytics)
@@ -378,7 +427,7 @@ Vínculos de login de cada jogador (domínio: identidade). Nunca une contas por 
 | --- | --- | --- | --- | --- |
 | `id` | bigint unsigned | não |  | Identificador interno do vínculo de identidade |
 | `player_id` | bigint unsigned | não |  | Jogador dono do vínculo (FK players.id) |
-| `provider` | varchar(16) | não |  | Provedor: guest (visitante com segredo do servidor), google ou facebook |
+| `provider` | varchar(16) | não |  | Provedor: guest (visitante com segredo do servidor), google, facebook ou apple |
 | `subject` | varchar(191) | não |  | Identificador estável do usuário no provedor (sub do Google, user_id do Facebook, guest_id do visitante) |
 | `secret_hash` | char(64) | sim |  | HMAC-SHA256 (hex) do segredo do visitante com APP_KEY; NULL para provedores externos |
 | `created_at` | datetime(6) | não | `CURRENT_TIMESTAMP(6)` | Instante UTC em que o vínculo foi criado |
@@ -441,7 +490,7 @@ Sessões do app com token de acesso curto e refresh rotativo (domínio: identida
 | `refresh_hash` | char(64) | não |  | HMAC-SHA256 (hex) do refresh token atual; troca a cada /auth/refresh |
 | `previous_refresh_hash` | char(64) | sim |  | HMAC do refresh token anterior; reapresentá-lo indica roubo e revoga a sessão. NULL antes da primeira rotação |
 | `refresh_expires_at` | datetime(6) | não |  | Instante UTC de expiração do refresh token (padrão 30 dias, renovado a cada rotação) |
-| `login_provider` | varchar(16) | não |  | Provedor usado para abrir a sessão: guest, google ou facebook |
+| `login_provider` | varchar(16) | não |  | Provedor usado para abrir a sessão: guest, google, facebook ou apple |
 | `user_agent` | varchar(255) | sim |  | User-Agent do app ao abrir a sessão (truncado em 255); NULL se ausente |
 | `created_at` | datetime(6) | não | `CURRENT_TIMESTAMP(6)` | Instante UTC de abertura da sessão |
 | `rotated_at` | datetime(6) | sim |  | Instante UTC da última rotação de tokens; NULL se nunca rotacionada |
@@ -669,6 +718,11 @@ Saldos correntes cash/gold; só alterados junto com economy_ledger na mesma tran
 | `economy_ledger` | `fk_ledger_player` | FOREIGN KEY |
 | `entitlements` | `ck_entitlements_source` | CHECK |
 | `entitlements` | `fk_entitlements_player` | FOREIGN KEY |
+| `experiment_assignments` | `fk_experiment_assignments_experiment` | FOREIGN KEY |
+| `experiment_assignments` | `fk_experiment_assignments_player` | FOREIGN KEY |
+| `experiments` | `ck_experiments_status` | CHECK |
+| `experiments` | `ck_experiments_traffic` | CHECK |
+| `experiments` | `fk_experiments_created_by` | FOREIGN KEY |
 | `game_events` | `fk_game_events_player` | FOREIGN KEY |
 | `iap_events` | `ck_iap_events_source` | CHECK |
 | `iap_events` | `fk_iap_events_transaction` | FOREIGN KEY |

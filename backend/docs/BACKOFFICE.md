@@ -18,7 +18,7 @@ Painel web servido pelo mesmo `index.php` da API (PHP no servidor, sem JavaScrip
 | Papel | Pode |
 |---|---|
 | admin | tudo, inclusive ajustar carteira e gerenciar usuários |
-| operation | Remote Config, produtos, campanhas push, regras de benefício, métricas, auditoria |
+| operation | Remote Config, produtos, campanhas push, regras de benefício, testes A/B, métricas, auditoria |
 | support | conceder benefício a um jogador e encerrar as sessões dele |
 | read | ver todas as telas, exceto auditoria e usuários |
 
@@ -33,6 +33,7 @@ Painel web servido pelo mesmo `index.php` da API (PHP no servidor, sem JavaScrip
 - **Eventos**: contagem por evento (7 dias) e eventos recentes.
 - **Campanhas push**: rascunho, público estimado, envio de teste, agendamento (horário de Brasília), cancelamento, contadores e erros.
 - **Regras de benefício**: versões, simulação, ativar/pausar, executar agora, histórico.
+- **Testes A/B**: rascunho com variantes (pesos e overrides só em `features`, `routes` e `tuning`; economia, manutenção e sync nunca entram), percentual de tráfego, evento de meta e versão mínima do app; iniciar, encerrar registrando a vencedora; resultados por variante (expostos, retenção D1/D7 de quem completou a janela, compradores, conversão no evento de meta). Para adotar a vencedora, publique uma nova versão do Remote Config.
 - **Calendário**: envios agendados por dia, regras ativas e campanhas recentes.
 - **Auditoria** e **Usuários**.
 

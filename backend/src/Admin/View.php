@@ -16,6 +16,7 @@ final class View
         'events' => ['Eventos', 'view'],
         'campaigns' => ['Campanhas push', 'view'],
         'rules' => ['Regras de benefício', 'view'],
+        'experiments' => ['Testes A/B', 'view'],
         'calendar' => ['Calendário', 'view'],
         'audit' => ['Auditoria', 'audit.view'],
         'users' => ['Usuários', 'users.manage'],
