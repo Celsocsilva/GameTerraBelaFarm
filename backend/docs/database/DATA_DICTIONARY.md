@@ -115,6 +115,7 @@ Ledger append-only de moedas; fonte da verdade dos saldos (domínio: economia)
 
 | Índice | Colunas | Único | Descrição |
 | --- | --- | --- | --- |
+| `ix_ledger_created` | created_at,currency,source,amount | não | Totais de moeda por período e origem (métricas, painel e ledger 24 h); cobre a soma |
 | `ix_ledger_player_daily` | player_id,currency,source,created_at | não | Soma de créditos do cliente no dia para o teto diário |
 | `ix_ledger_player_id` | player_id,id | não | Histórico paginado por cursor do jogador |
 | `PRIMARY` | id | sim | Chave interna do lançamento |
@@ -158,6 +159,7 @@ Telemetria client-side recebida em lote (domínio: analytics)
 | --- | --- | --- | --- |
 | `ix_game_events_name_time` | event_name,occurred_at | não | Agregados diários por evento para o dashboard |
 | `ix_game_events_player_time` | player_id,occurred_at,id | não | Linha do tempo do jogador e retenção por coorte; atende a FK |
+| `ix_game_events_time_player` | occurred_at,player_id | não | DAU e contagens por período (métricas e painel); cobre player_id |
 | `PRIMARY` | id | sim | Chave interna |
 | `uq_game_events_event_id` | event_id | sim | Invariante: cada event_id é gravado uma vez |
 
@@ -231,8 +233,10 @@ Compras na loja validadas no servidor (domínio: monetização). Retida para aud
 | Índice | Colunas | Único | Descrição |
 | --- | --- | --- | --- |
 | `ix_iap_tx_finalize` | finalize_status,updated_at | não | Seleção pelo cron das compras com consume/acknowledge pendente |
+| `ix_iap_tx_granted` | granted_at | não | Compras concedidas por dia (métricas) |
 | `ix_iap_tx_player` | player_id,created_at | não | Histórico de compras do jogador; atende a FK player_id |
 | `ix_iap_tx_product` | product_id | não | Atende a FK product_id e relatórios por produto |
+| `ix_iap_tx_refunded` | refunded_at | não | Reembolsos por dia (métricas e painel) |
 | `PRIMARY` | id | sim | Chave interna |
 | `uq_iap_tx_order` | platform,order_id | sim | Invariante: um pedido da loja gera no máximo uma transação (NULLs permitidos) |
 | `uq_iap_tx_public_id` | public_id | sim | Unicidade do identificador público |
@@ -289,6 +293,7 @@ Eventos de engajamento com notificações push (domínio: LiveOps)
 | Índice | Colunas | Único | Descrição |
 | --- | --- | --- | --- |
 | `ix_notification_events_campaign` | campaign_id,event_type | não | Contagem de aberturas por campanha no dashboard |
+| `ix_notification_events_time` | occurred_at | não | Aberturas de push por dia (métricas) |
 | `PRIMARY` | id | sim | Chave interna |
 | `uq_notification_events_once` | player_id,notification_id,event_type | sim | Invariante: abertura contada uma vez por jogador e notificação; atende a FK |
 
@@ -315,6 +320,7 @@ Fila durável de envio FCM com nova tentativa e status distintos (domínio: Live
 | `ix_outbox_device` | device_id | não | Atende a FK device_id |
 | `ix_outbox_player_sent` | player_id,status,sent_at | não | Contagem de pushes promocionais por jogador na semana; atende a FK player_id |
 | `ix_outbox_status_schedule` | status,scheduled_at,id | não | Seleção ordenada das tarefas elegíveis pelo cron |
+| `ix_outbox_status_sent` | status,sent_at | não | Pushes aceitos por dia (métricas e painel) |
 | `PRIMARY` | id | sim | Chave interna |
 | `uq_outbox_campaign_device` | campaign_id,device_id | sim | Invariante: no máximo uma mensagem por campanha e instalação; atende a FK campaign_id |
 
@@ -358,6 +364,7 @@ Instalações do app e tokens FCM por jogador (domínio: notificações)
 
 | Índice | Colunas | Único | Descrição |
 | --- | --- | --- | --- |
+| `ix_devices_audience` | locale,revoked_at,platform | não | Público de campanhas push por idioma/plataforma entre instalações ativas |
 | `PRIMARY` | id | sim | Chave interna da instalação |
 | `uq_devices_fcm_token_hash` | fcm_token_hash | sim | Um token FCM aponta para uma única instalação ativa |
 | `uq_devices_player_installation` | player_id,installation_id | sim | Uma linha por instalação de cada jogador; atende a FK player_id |
@@ -443,9 +450,11 @@ Sessões do app com token de acesso curto e refresh rotativo (domínio: identida
 
 | Índice | Colunas | Único | Descrição |
 | --- | --- | --- | --- |
+| `ix_sessions_created` | created_at,player_id | não | DAU por sessões iniciadas no dia (métricas); cobre player_id |
 | `ix_sessions_player` | player_id,revoked_at | não | Revogação de todas as sessões ativas do jogador; atende a FK player_id |
 | `ix_sessions_previous_refresh` | previous_refresh_hash | não | Detecção de reuso de refresh token já rotacionado |
 | `ix_sessions_refresh_expiry` | refresh_expires_at | não | Limpeza periódica de sessões expiradas pelo cron |
+| `ix_sessions_rotated` | rotated_at,player_id | não | DAU por sessões renovadas no dia (métricas); cobre player_id |
 | `PRIMARY` | id | sim | Chave interna da sessão |
 | `uq_sessions_access_hash` | access_hash | sim | Autenticação de cada requisição pelo hash do token de acesso |
 | `uq_sessions_public_id` | public_id | sim | Unicidade do identificador público da sessão |
@@ -468,6 +477,7 @@ Contas de jogador (domínio: identidade). Uma fazenda por jogador
 
 | Índice | Colunas | Único | Descrição |
 | --- | --- | --- | --- |
+| `ix_players_created` | created_at | não | Novos jogadores por dia e coortes de retenção (métricas e painel) |
 | `ix_players_last_seen` | last_seen_at,id | não | Consultas de atividade (DAU/MAU, segmentação por última atividade) |
 | `ix_players_status_deletion` | status,deletion_requested_at | não | Seleção pelo cron das contas com exclusão pendente após a carência |
 | `PRIMARY` | id | sim | Chave interna compacta para FKs |
@@ -535,6 +545,7 @@ Benefícios concedidos a jogadores e seu resgate idempotente (domínio: recompen
 
 | Índice | Colunas | Único | Descrição |
 | --- | --- | --- | --- |
+| `ix_reward_grants_claimed` | claimed_at | não | Benefícios resgatados por dia (métricas e painel) |
 | `ix_reward_grants_ledger` | ledger_id | não | Atende a FK ledger_id e auditoria do resgate |
 | `ix_reward_grants_player_status` | player_id,status,expires_at | não | Listagem de benefícios disponíveis em GET /rewards |
 | `PRIMARY` | id | sim | Chave interna |

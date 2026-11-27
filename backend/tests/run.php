@@ -171,7 +171,7 @@ test('health e rota inexistente', function () use ($makeApp) {
     $c = new Client($makeApp());
     $r = $c->call('GET', '/health');
     eq(200, $r->status, 'health 200');
-    eq('003_backoffice_liveops', $c->last['schema_version'], 'versão do schema');
+    eq('004_perf_indexes', $c->last['schema_version'], 'versão do schema');
     check(isset($r->headers['X-Request-Id']), 'X-Request-Id presente');
     eq(404, $c->call('GET', '/nao-existe')->status, '404');
     eq(405, $c->call('DELETE', '/health')->status, '405');
@@ -947,6 +947,90 @@ test('métricas diárias e cron completo', function () use ($makeApp) {
     $rep = json_decode((string) $out, true);
     check(is_array($rep) && isset($rep['rules'], $rep['push'], $rep['metrics_rows'], $rep['admin_sessions_deleted']), 'cron roda regras, push, métricas e limpeza: ' . trim((string) $out));
     eq(0, $rep['push']['fcm_configured'] ?? null, 'sem FCM configurado o push só registra');
+});
+
+test('MVP-12 backup: snapshot, restauração idêntica, criptografia e retenção', function () use ($makeApp, &$baseConfig, $storage) {
+    $app = $makeApp();
+    $c = new Client($app);
+    $c->guest();
+    $c->call('POST', '/sync', ['operation_id' => 'op-bk-' . bin2hex(random_bytes(3)), 'base_revision' => 0, 'schema_version' => 1, 'snapshot' => ['texto' => "linha1\nlinha2; fim;", 'emoji' => 'çãé🌽']]);
+    $dir = $storage . '/bk-' . bin2hex(random_bytes(3));
+    $svc = new \TerraBela\Ops\BackupService($app->db, $app->clock, $dir, 2);
+    $r = $svc->create();
+    check($r['tables'] >= 28 && $r['rows'] > 0 && $r['bytes'] > 0, 'backup criado: ' . json_encode($r));
+    check(is_file($dir . '/.htaccess'), 'pasta de backup bloqueada para a web');
+    $rcfg = $baseConfig->with('DB_NAME', 'tbf_test_restore');
+    $target = Db::fromConfig($rcfg);
+    $target->pdo->exec('SET FOREIGN_KEY_CHECKS = 0');
+    foreach ($target->all('SELECT TABLE_NAME t FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE()') as $t) {
+        $target->pdo->exec('DROP TABLE `' . $t['t'] . '`');
+    }
+    $target->pdo->exec('SET FOREIGN_KEY_CHECKS = 1');
+    $res = $svc->restore($r['file'], $target);
+    check($res['statements'] > 30, 'comandos aplicados: ' . $res['statements']);
+    $diff = [];
+    foreach ($app->db->all("SELECT TABLE_NAME t FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME NOT IN ('rate_limits','admin_sessions')") as $t) {
+        $a = $app->db->one('CHECKSUM TABLE `' . $t['t'] . '`')['Checksum'];
+        $b = $target->one('CHECKSUM TABLE `' . $t['t'] . '`')['Checksum'] ?? null;
+        if ((string) $a !== (string) $b) {
+            $diff[] = $t['t'];
+        }
+    }
+    eq([], $diff, 'todas as tabelas idênticas após restaurar (CHECKSUM TABLE)');
+    eq(0, (int) $target->one('SELECT COUNT(*) n FROM rate_limits')['n'], 'tabela volátil só com estrutura');
+    $snap = json_decode($target->one('SELECT snapshot FROM player_saves ORDER BY updated_at DESC LIMIT 1')['snapshot'], true);
+    eq("linha1\nlinha2; fim;", $snap['texto'] ?? null, 'texto com quebra de linha e ; restaurado');
+    $enc = new \TerraBela\Ops\BackupService($app->db, $app->clock, $dir, 2, str_repeat('ab', 32));
+    $e = $enc->create();
+    check($e['encrypted'] && str_ends_with($e['file'], '.enc'), 'backup criptografado');
+    check(!str_contains((string) file_get_contents($dir . '/' . $e['file']), 'CREATE TABLE'), 'conteúdo ilegível sem a chave');
+    $wrong = new \TerraBela\Ops\BackupService($app->db, $app->clock, $dir, 2, str_repeat('cd', 32));
+    try {
+        $wrong->restore($e['file'], $target);
+        check(false, 'chave errada deveria falhar');
+    } catch (\RuntimeException) {
+        check(true, 'chave errada recusada');
+    }
+    check($enc->restore($e['file'], $target)['statements'] > 30, 'restaura com a chave certa');
+    $svc->create();
+    eq(2, count($svc->list()), 'retenção mantém só os 2 mais novos');
+    check($svc->recent(20), 'detecta backup recente (cron não repete no dia)');
+});
+
+test('MVP-12 exportação de dados do jogador (LGPD)', function () use ($makeApp) {
+    $app = $makeApp();
+    $app->db->exec('DELETE FROM rate_limits');
+    $c = new Client($app);
+    $g = $c->guest();
+    $c->call('POST', '/sync', ['operation_id' => 'op-ex-' . bin2hex(random_bytes(3)), 'base_revision' => 0, 'schema_version' => 1, 'snapshot' => ['fazenda' => 'teste']]);
+    $c->call('PUT', '/preferences/notifications', ['promotional' => true]);
+    $r = $c->call('GET', '/me/export');
+    eq(200, $r->status, 'exportação 200');
+    check(str_contains($r->headers['Content-Disposition'] ?? '', 'attachment'), 'baixa como arquivo');
+    $d = $c->last;
+    eq(\TerraBela\Players\DataExport::SCHEMA, $d['schema'] ?? null, 'schema versionado');
+    eq($g['player_id'], $d['account']['player_id'] ?? null, 'conta certa');
+    eq('teste', $d['cloud_save']['snapshot']['fazenda'] ?? null, 'save incluído');
+    check(count($d['consents']) >= 1 && isset($d['ledger'], $d['devices'], $d['purchases'], $d['rewards'], $d['game_events']), 'seções completas');
+    $raw = $r->body;
+    check(!str_contains($raw, $g['guest_secret']) && !str_contains($raw, 'secret_hash') && !str_contains($raw, $c->access), 'sem segredos de autenticação');
+    $c->call('GET', '/me/export');
+    $c->call('GET', '/me/export');
+    eq(429, $c->call('GET', '/me/export')->status, 'limite de 3 exportações por hora');
+    [$e, $p] = make_admin($app, 'support', 'sup-export@example.test');
+    $a = new AdminClient($app);
+    $a->login($e, $p);
+    $x = $a->post('players/' . $g['player_id'] . '/export');
+    eq(200, $x->status, 'suporte exporta pelo painel');
+    check(str_starts_with($x->headers['Content-Type'] ?? '', 'application/json') && str_contains($x->body, $g['player_id']), 'JSON do jogador');
+    eq(1, (int) $app->db->one("SELECT COUNT(*) n FROM admin_audit_log WHERE action = 'player_data_export' AND target_id = ?", [$g['player_id']])['n'], 'exportação auditada');
+    eq(403, $a->req('GET', 'system')->status, 'suporte não vê sistema/backup');
+    [$e2, $p2] = make_admin($app, 'admin', 'adm-bk@example.test');
+    $b = new AdminClient($app);
+    $b->login($e2, $p2);
+    eq(200, $b->req('GET', 'system')->status, 'admin vê sistema/backup');
+    $b->post('system/backup');
+    check(str_contains($b->flash(), 'Backup criado'), 'backup pelo painel: ' . $b->flash());
 });
 
 test('dicionário de dados: 100% de COMMENT', function () {

@@ -108,6 +108,14 @@ No `.env` de produção, atrás da Cloudflare use `TRUST_PROXY=cloudflare` e, pa
 
 Produtos de compra entram pelo backoffice (Produtos → Nova versão) quando os SKUs existirem no Play Console.
 
+## Backup e restauração (TBF-MVP-12)
+
+- O cron faz **1 backup por dia** em `terrabelafarm_app/storage/backups/` (SQL compactado, fora do public_html, mantém 14; `BACKUP_KEEP`). Com `BACKUP_ENCRYPTION_KEY` (64 hex) o arquivo sai criptografado (`.enc`): guarde a chave fora do servidor, sem ela o backup não abre.
+- Backup manual: backoffice → Sistema e backup → Fazer backup agora.
+- **Restaurar** (sem SSH): baixe o `.sql.gz` por FTP; no cPanel crie um banco vazio; phpMyAdmin → Importar o arquivo; confira o painel apontando um `.env` de teste para ele; só então troque `DB_NAME` no `.env` de produção. Com SSH: `php bin/restore.php ARQUIVO --confirm` (aceita `.enc`).
+- A restauração é testada a cada versão (`tests/run.php`: tabelas idênticas por CHECKSUM TABLE depois de restaurar num banco vazio).
+- Desempenho: `php bin/bench.php 20000` (só em banco de teste) mede as consultas críticas e falha se alguma varrer tabela grande.
+
 ## Desfazer
 
 - Tirar do ar: renomeie `public_html/terrabelafarm/index.php` (a API para na hora).

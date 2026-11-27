@@ -19,6 +19,7 @@ final class View
         'calendar' => ['Calendário', 'view'],
         'audit' => ['Auditoria', 'audit.view'],
         'users' => ['Usuários', 'users.manage'],
+        'system' => ['Sistema e backup', 'system.manage'],
     ];
 
     public function __construct(public readonly string $base, public readonly string $nonce)

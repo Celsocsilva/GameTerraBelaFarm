@@ -35,6 +35,8 @@ use TerraBela\LiveOps\CampaignService;
 use TerraBela\LiveOps\FcmClient;
 use TerraBela\LiveOps\MetricsService;
 use TerraBela\LiveOps\RuleEngine;
+use TerraBela\Ops\BackupService;
+use TerraBela\Players\DataExport;
 use TerraBela\Players\PlayerService;
 use TerraBela\Rewards\RewardService;
 
@@ -56,6 +58,8 @@ final class App
     public readonly RuleEngine $rules;
     public readonly MetricsService $metrics;
     public readonly RateLimiter $limiter;
+    public readonly BackupService $backups;
+    public readonly DataExport $exporter;
     private Router $router;
     private ?AdminApp $admin = null;
 
@@ -85,6 +89,9 @@ final class App
         $this->campaigns = new CampaignService($this->db, $this->clock, $fcm, $config->int('PUSH_PROMO_WEEKLY_CAP', 3));
         $this->rules = new RuleEngine($this->db, $this->clock, $this->rewards);
         $this->metrics = new MetricsService($this->db, $this->clock);
+        $backupDir = $config->optional('BACKUP_DIR') ?? ($storage ?? sys_get_temp_dir()) . '/backups';
+        $this->backups = new BackupService($this->db, $this->clock, $backupDir, $config->int('BACKUP_KEEP', 14), $config->optional('BACKUP_ENCRYPTION_KEY'));
+        $this->exporter = new DataExport($this->db, $this->clock);
         $this->iap = new IapService($this->db, $this->clock, $this->ledger, $play, $google, $this->log, $config->optional('RTDN_AUDIENCE'), $config->optional('RTDN_SERVICE_ACCOUNT_EMAIL'));
 
         $auth = new AuthApi($this->db, $this->clock, $this->tokens, $this->players, $google, $facebook, $config->list('GOOGLE_CLIENT_IDS'), $appKey);
@@ -106,6 +113,10 @@ final class App
         $r->add('POST', $p . '/auth/logout', $auth->logout(...), ['auth' => true]);
         $r->add('GET', $p . '/me', $me->get(...), ['auth' => true]);
         $r->add('DELETE', $p . '/me', $me->delete(...), ['auth' => true]);
+        $r->add('GET', $p . '/me/export', function (Request $q, $ctx) {
+            $this->limiter->hit('export', (string) $ctx->playerId, $this->config->int('RATE_EXPORT_PER_HOUR', 3), 3600);
+            return Response::json($this->exporter->export($ctx->playerId), 200, ['Content-Disposition' => 'attachment; filename="terrabela-meus-dados.json"']);
+        }, ['auth' => true]);
         $r->add('PUT', $p . '/preferences/notifications', $me->putNotificationPreferences(...), ['auth' => true]);
         $r->add('GET', $p . '/save', $save->get(...), ['auth' => true]);
         $r->add('POST', $p . '/sync', $save->sync(...), ['auth' => true]);

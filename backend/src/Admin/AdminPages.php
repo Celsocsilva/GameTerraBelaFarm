@@ -30,6 +30,9 @@ final class AdminPages
             ['POST', "#^players/($u)/wallet$#", 'wallet.adjust', fn ($m) => $this->walletAdjust($m[1])],
             ['POST', "#^players/($u)/reward$#", 'players.support', fn ($m) => $this->rewardGrant($m[1])],
             ['POST', "#^players/($u)/revoke$#", 'players.support', fn ($m) => $this->revokeSessions($m[1])],
+            ['POST', "#^players/($u)/export$#", 'players.support', fn ($m) => $this->playerExport($m[1])],
+            ['GET', '#^system$#', 'system.manage', fn () => $this->system()],
+            ['POST', '#^system/backup$#', 'system.manage', fn () => $this->backupNow()],
             ['GET', '#^ledger$#', 'view', fn () => $this->ledger()],
             ['GET', '#^purchases$#', 'view', fn () => $this->purchases()],
             ['GET', '#^products$#', 'view', fn () => $this->products()],
@@ -311,6 +314,8 @@ final class AdminPages
                     . '<label>Quantidade</label><input name="amount" type="number" required min="1" max="100000">'
                     . '<label>Expira em (dias, vazio = não expira)</label><input name="days" type="number" min="1" max="365">'
                     . '<label>Motivo (fica na auditoria)</label><input name="note" required minlength="5" maxlength="200">', 'stack', 'Conceder') . '</div>'
+                . '<div class="card"><b>Exportar dados (LGPD)</b><p class="muted">Arquivo JSON com tudo o que o servidor guarda sobre a conta, para atender pedido do titular. Fica registrado na auditoria.</p>'
+                . $this->form('players/' . $uuid . '/export', '', 'stack', 'Baixar JSON', 'ghost') . '</div>'
                 . '<div class="card"><b>Encerrar sessões</b><p class="muted">Desconecta o jogador em todos os aparelhos (ele entra de novo com o mesmo login).</p>'
                 . $this->form('players/' . $uuid . '/revoke', '', 'stack', 'Encerrar sessões', 'danger') . '</div>';
         }
@@ -410,6 +415,56 @@ final class AdminPages
             $this->a->app->tokens->revokeAll((int) $p['id'], 'admin');
             $this->a->audit('player_sessions_revoked', 'player', $uuid);
             return 'Sessões encerradas.';
+        });
+    }
+
+    private function playerExport(string $uuid): Response
+    {
+        try {
+            $p = $this->playerByUuid($uuid);
+        } catch (AdminError $e) {
+            return $this->a->render('Jogador não encontrado', '', 'players', 404);
+        }
+        $data = $this->a->app->exporter->export((int) $p['id']);
+        $this->a->audit('player_data_export', 'player', $uuid, ['sections' => array_keys($data)]);
+        return new Response(200, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES), [
+            'Content-Type' => 'application/json; charset=utf-8',
+            'Content-Disposition' => 'attachment; filename="terrabela-jogador-' . substr($uuid, 0, 8) . '.json"',
+        ]);
+    }
+
+    // ------------------------------------------------------------------ sistema e backup
+
+    private function system(): Response
+    {
+        $b = $this->a->app->backups;
+        $list = $b->list();
+        $db = $this->a->db;
+        $sizes = $db->all('SELECT TABLE_NAME t, TABLE_ROWS r, ROUND((DATA_LENGTH + INDEX_LENGTH) / 1024) kb FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() ORDER BY (DATA_LENGTH + INDEX_LENGTH) DESC LIMIT 12');
+        $body = '<div class="cols"><div class="card">' . View::dl([
+                'Backups guardados' => count($list) . ' (mantém os ' . $this->a->app->config->int('BACKUP_KEEP', 14) . ' mais novos)',
+                'Último backup' => $list === [] ? 'nenhum ainda' : View::dt($list[0]['created_at']),
+                'Automático' => $this->a->app->config->bool('BACKUP_ENABLED', true) ? 'sim, 1 por dia pelo cron' : 'desligado (BACKUP_ENABLED=0)',
+                'Criptografia' => $this->a->app->config->optional('BACKUP_ENCRYPTION_KEY') === null ? 'não (arquivo fica fora do public_html)' : 'AES-256-GCM',
+                'PHP' => PHP_VERSION,
+                'Banco' => $db->one('SELECT VERSION() v')['v'],
+            ]) . $this->form('system/backup', '', 'inline', 'Fazer backup agora') . '</div>'
+            . '<div class="card"><b>Restaurar</b><p class="muted">Restauração não é feita pela web (risco de apagar dados por engano). Procedimento em DEPLOY.md: baixe o arquivo por FTP de <code>terrabelafarm_app/storage/backups/</code>, importe no phpMyAdmin num banco vazio, confira e só então troque o DB_NAME do .env. Teste de restauração automatizado roda a cada versão (tests/run.php).</p></div></div>'
+            . '<h2>Backups</h2>' . View::table($list, [
+                'file' => 'Arquivo',
+                'Tamanho' => fn ($r) => View::h(number_format($r['bytes'] / 1024, 1, ',', '.') . ' KB'),
+                'Criado' => fn ($r) => View::dt($r['created_at']),
+            ], 'Nenhum backup ainda.')
+            . '<h2>Maiores tabelas</h2>' . View::table($sizes, ['t' => 'Tabela', 'r' => 'Linhas (aprox.)', 'kb' => 'KB']);
+        return $this->a->render('Sistema e backup', $body, 'system');
+    }
+
+    private function backupNow(): Response
+    {
+        return $this->a->act('system.manage', 'system', function () {
+            $r = $this->a->app->backups->create();
+            $this->a->audit('backup_created', 'backup', $r['file'], ['rows' => $r['rows'], 'bytes' => $r['bytes'], 'sha256' => $r['sha256']]);
+            return "Backup criado: {$r['file']} ({$r['tables']} tabelas, {$r['rows']} linhas, {$r['seconds']} s).";
         });
     }
 

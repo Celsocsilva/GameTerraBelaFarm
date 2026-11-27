@@ -22,6 +22,15 @@ if ($lock === false || !flock($lock, LOCK_EX | LOCK_NB)) {
 
 $report = [];
 $report['iap_finalize'] = $app->iap->reconcilePending();
+if ($app->config->bool('BACKUP_ENABLED', true) && !$app->backups->recent(20)) {
+    try {
+        $b = $app->backups->create();
+        $report['backup'] = $b['file'] . ' (' . $b['rows'] . ' linhas, ' . $b['bytes'] . ' bytes)';
+    } catch (Throwable $e) {
+        $report['backup'] = 'erro: ' . get_class($e);
+        $app->log->error('cron_backup', ['type' => get_class($e), 'msg' => $e->getMessage()]);
+    }
+}
 foreach (['rules' => fn () => $app->rules->runActive(), 'push' => fn () => $app->campaigns->runDue(500), 'metrics_rows' => fn () => $app->metrics->recompute(1)] as $k => $job) {
     try {
         $report[$k] = $job();

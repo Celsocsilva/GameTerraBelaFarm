@@ -6,3 +6,5 @@ storage/cache/*
 !storage/cache/.gitkeep
 credentials/
 dist/
+storage/backups/*
+!storage/backups/.htaccess

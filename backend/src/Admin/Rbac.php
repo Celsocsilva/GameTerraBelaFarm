@@ -26,6 +26,7 @@ final class Rbac
         'rules.manage' => ['admin', 'operation'],
         'audit.view' => ['admin', 'operation'],
         'users.manage' => ['admin'],
+        'system.manage' => ['admin'],
     ];
 
     public static function can(string $role, string $permission): bool
