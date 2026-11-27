@@ -1,0 +1,17 @@
+{
+  "_note": "Valores propostos pelo backend MVP; limites econômicos pendentes de aprovação do Product Owner.",
+  "maintenance": {"enabled": false, "message": null},
+  "features": {"cloud_save_enabled": true, "store_enabled": false, "push_enabled": false, "rewards_enabled": false},
+  "economy": {
+    "client_credit": {
+      "cash": {
+        "reasons": ["sale_collected", "milk_sold", "wood_sold", "order_completed"],
+        "max_per_operation": 5000,
+        "max_per_day": 200000
+      }
+    },
+    "client_debit_reasons": ["helper_hired", "plot_unlocked", "animal_purchased", "upgrade_purchased", "seed_purchased", "shop_purchase"]
+  },
+  "sync": {"interval_seconds": 120, "max_snapshot_bytes": 262144},
+  "routes": {"enabled": ["farm", "shop"]}
+}

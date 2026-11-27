@@ -1,0 +1,8 @@
+# Proteção extra: se esta pasta (código do backend) acabar dentro da área pública, nada é servido.
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+<IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+</IfModule>

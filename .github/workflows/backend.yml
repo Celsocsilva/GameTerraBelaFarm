@@ -1,0 +1,53 @@
+name: Backend PHP + MySQL
+
+on:
+  pull_request:
+    paths: ['backend/**', '.github/workflows/backend.yml']
+  push:
+    branches: [main]
+    paths: ['backend/**']
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root_ci_only
+          MYSQL_DATABASE: tbf_test
+          MYSQL_USER: tbf
+          MYSQL_PASSWORD: tbf_ci_only
+        ports: ['3306:3306']
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_ci_only"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: false
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo_mysql, openssl, curl, mbstring, pcntl, posix
+      - name: Lint
+        run: find backend -name '*.php' -print0 | xargs -0 -n1 php -l > /dev/null
+      - name: Env de teste (sem segredos reais)
+        run: |
+          cat > /tmp/test.env <<'ENV'
+          APP_ENV=local
+          APP_KEY=0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          DB_HOST=127.0.0.1
+          DB_NAME=tbf_test
+          DB_USER=tbf
+          DB_PASSWORD=tbf_ci_only
+          GOOGLE_CLIENT_IDS=test-client.apps.googleusercontent.com
+          FACEBOOK_APP_ID=1234
+          FACEBOOK_APP_SECRET=fb-test
+          RTDN_AUDIENCE=https://example.test/rtdn
+          RTDN_SERVICE_ACCOUNT_EMAIL=rtdn@test.iam.gserviceaccount.com
+          ENV
+      - name: Testes de integração (MySQL real)
+        run: TBF_ENV_FILE=/tmp/test.env php backend/tests/run.php
+      - name: Dicionário de dados (100% COMMENT)
+        run: TBF_ENV_FILE=/tmp/test.env php backend/bin/datadict.php /tmp/datadict.md

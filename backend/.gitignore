@@ -1,0 +1,8 @@
+.env
+public/app-path.php
+storage/logs/*
+storage/cache/*
+!storage/logs/.gitkeep
+!storage/cache/.gitkeep
+credentials/
+dist/
